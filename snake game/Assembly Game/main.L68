@@ -1,0 +1,2035 @@
+00001000 Starting Address
+Assembler used: EASy68K Editor/Assembler v5.16.01
+Created On: 8/8/2025 11:24:45 AM
+
+00000000                             1   *-----------------------------------------------------------
+00000000                             2  * Title      : Main
+00000000                             3  * Written by : Enya Bullard
+00000000                             4  * Date       : 5/28/2025
+00000000                             5  * Description: Recreation of the snake game except you get faster with each fruit eaten!
+00000000                             6  *              Main.X68 is where we run the game, and contains all the includes for functions.
+00000000                             7  *-----------------------------------------------------------
+00000000  =00000021                  8  SET_OUTPUT_RESOLUTION_TRAP_CODE        equ     33
+00000000  =0000005C                  9  DRAW_MODE_TRAP_CODE                    equ     92 
+00000000  =00000011                 10  ENABLE_DOUBLE_BUFFER_TRAP_CODE         equ     17 
+00000000                            11  
+00000000  =00000320                 12  SCREEN_WIDTH                           equ     800
+00000000  =000002BC                 13  SCREEN_HEIGHT                          equ     700
+00000000                            14  
+00000000  =00000020                 15  SPACE_KEY                              equ     $20
+00000000  =0000000D                 16  ENTER_KEY                              equ     $D
+00000000                            17  
+00000000                            18  ALL_REG                                reg     D0-D7/A0-A6
+00000000                            19  
+00001000                            20      ORG    $1000
+00001000                            21      
+00001000                            22  START: 
+00001000                            23  
+00001000                            24  
+00001000                            25  *-----------------------------------------------------------
+00001000                            26  * Set screen to 800x700
+00001000                            27  *-----------------------------------------------------------
+00001000  103C 0021                 28      move.b #SET_OUTPUT_RESOLUTION_TRAP_CODE, d0
+00001004  223C 00000320             29      move.l  #SCREEN_WIDTH,d1
+0000100A  4841                      30      swap.w  d1                              
+0000100C  323C 02BC                 31      move.w  #SCREEN_HEIGHT,d1
+00001010  4E4F                      32      trap #15
+00001012                            33      
+00001012                            34      
+00001012                            35  *-----------------------------------------------------------
+00001012                            36  * Set drawing mode to enable double buffering
+00001012                            37  *-----------------------------------------------------------
+00001012  103C 005C                 38      move.b #DRAW_MODE_TRAP_CODE, d0
+00001016  123C 0011                 39      move.b #ENABLE_DOUBLE_BUFFER_TRAP_CODE,d1
+0000101A  4E4F                      40      trap #15
+0000101C                            41      
+0000101C                            42  
+0000101C                            43  *-----------------------------------------------------------
+0000101C                            44  * Set the loading screen, and swap when title screen is done drawing
+0000101C                            45  *-----------------------------------------------------------
+0000101C                            46  restart:
+0000101C  4EB9 00001062             47      jsr clearRegisters
+00001022  4EB9 0000143E             48      jsr clearScreen
+00001028  4EB9 000010AE             49      jsr loadingScreen  
+0000102E  4EB9 00001102             50      jsr titleScreen
+00001034                            51      
+00001034                            52      
+00001034                            53  *-----------------------------------------------------------
+00001034                            54  * Checks for space press, and when pressed, enters the game screen and starts the game
+00001034                            55  *-----------------------------------------------------------    
+00001034                            56  enterGame
+00001034  7420                      57      move.l #SPACE_KEY,d2                    
+00001036  103C 0013                 58      move.b #CHECK_INPUT_TRAP_CODE,d0
+0000103A  2202                      59      move.l d2,d1                            ;check if space was pressed
+0000103C  C2BC 000000FF             60      and.l #$00FF,d1
+00001042  4E4F                      61      trap   #15
+00001044  0C01 0000                 62      cmpi.b #00,d1                           ;if space was pressed, start game. 
+00001048  67EA                      63      beq enterGame                           ;Otherwise continue check
+0000104A  4EB9 000FEBC8             64      jsr playEnterSound
+00001050  4EB9 000010AE             65      jsr loadingScreen
+00001056  4EB9 00001246             66      jsr gameScreen
+0000105C  4EF9 000FC546             67      jmp startGameLoop
+00001062                            68      
+00001062                            69  
+00001062                            70  *-----------------------------------------------------------
+00001062                            71  * Function that clears all registers and takes no argument.
+00001062                            72  *-----------------------------------------------------------
+00001062                            73  clearRegisters
+00001062  4280                      74       clr.l d0
+00001064  4281                      75       clr.l d1
+00001066  4282                      76       clr.l d2
+00001068  4283                      77       clr.l d3
+0000106A  4284                      78       clr.l d4
+0000106C  4285                      79       clr.l d5
+0000106E  4286                      80       clr.l d6
+00001070  4287                      81       clr.l d7
+00001072                            82      
+00001072  4E75                      83       rts
+00001074                            84  
+00001074                            85  
+00001074                            86  *-----------------------------------------------------------
+00001074                            87  * Function that clears memory for snake position
+00001074                            88  *-----------------------------------------------------------
+00001074                            89  clearMemory
+00001074  43F9 000FC8E2             90       lea SnakeX, a1
+0000107A  45F9 000FD882             91       lea SnakeY, a2
+00001080  47F9 000FE822             92       lea SnakeBodyLength, a3
+00001086  2A13                      93       move.l (a3),d5
+00001088  5385                      94       subi.l #1,d5                                    ;dbra stops loop at -1
+0000108A                            95  clearLoop:
+0000108A  22FC FFFFFFFF             96       move.l #$FFFFFFFF,(a1)+
+00001090  24FC FFFFFFFF             97       move.l #$FFFFFFFF,(a2)+
+00001096  51CD FFF2                 98       dbra d5, clearLoop
+0000109A                            99      
+0000109A  26BC 00000001            100       move.l #1,(a3)                                  ;reinitialize size to be 1
+000010A0  47F9 000FEB96            101       lea CollisionFlag, a3                           ;reinitialize collision flag to be 0
+000010A6  26BC 00000000            102       move.l #0,(a3)
+000010AC  4E75                     103       rts
+000010AE                           104  
+000010AE                           105  
+000010AE                           106     
+000010AE                           107  
+000010AE                           108  *-----------------------------------------------------------
+000010AE                           109  * Includes
+000010AE                           110  *----------------------------------------------------------- 
+000010AE                           111      INCLUDE gameScreens.X68
+000010AE  =0000005F                112  SET_TEXT_POSITION_TRAP_CODE  equ 95
+000010AE  =00000003                113  DISPLAY_NUMBER_TRAP_CODE     equ 3
+000010AE  =0000000B                114  SET_CURSOR_TRAP_CODE         equ 11
+000010AE  =00000004                115  DRAW_COLOR_COMMAND           equ 4
+000010AE  =00000051                116  SET_FILL_COLOR_TRAP_CODE     equ 81
+000010AE  =0000005A                117  DRAW_UNFILLED_RECT           equ 90
+000010AE  =00000057                118  DRAW_RECTANGLE_TRAP_CODE     equ 87
+000010AE  =0000005D                119  PEN_WIDTH_TRAP_CODE          equ 93
+000010AE  =0000005E                120  REPAINT_SCREEN_TRAP_CODE     equ 94
+000010AE  =0000000B                121  CLEAR_SCREEN_TRAP_CODE       equ 11
+000010AE                           122  
+000010AE  =0000000D                123  FRUIT_WIDTH                  equ 13
+000010AE  =0000000F                124  FRUIT_HEIGHT                 equ 15
+000010AE                           125  
+000010AE  =00000019                126  GAME_BORDER_X                equ 25
+000010AE  =00000014                127  GAME_BORDER_Y                equ 20
+000010AE  =00000307                128  GAME_BORDER_WIDTH            equ 775
+000010AE  =00000258                129  GAME_BORDER_HEIGHT           equ 600
+000010AE                           130  
+000010AE  =00000115                131  TITLE_TEXT_X                 equ 277
+000010AE  =00000258                132  TITLE_TEXT_Y                 equ 600
+000010AE                           133  
+000010AE  =000000B4                134  INS_TEXT_X                   equ 180
+000010AE  =0000028A                135  INS_TEXT_Y                   equ 650
+000010AE                           136  
+000010AE  =00000122                137  GAME_OVER_TEXT_X             equ 290
+000010AE  =000000C3                138  GAME_OVER_TEXT_Y             equ 195
+000010AE                           139  
+000010AE  =000000FE                140  RESTART_TITLE_TEXT_X         equ 254
+000010AE  =000000DC                141  RESTART_TITLE_TEXT_Y         equ 220
+000010AE                           142  
+000010AE  =00000122                143  RESTART_GAME_TEXT_X          equ 290
+000010AE  =000000F5                144  RESTART_GAME_TEXT_Y          equ 245
+000010AE                           145  
+000010AE  =00000113                146  LOADING_WIDTH                equ 275
+000010AE  =0000005E                147  LOADIND_HEIGHT               equ 94
+000010AE  =000000FA                148  LOADING_Y                    equ 250
+000010AE                           149  
+000010AE  =000001A4                150  LOGO_WIDTH                   equ 420
+000010AE  =0000009C                151  LOGO_HEIGHT                  equ 156
+000010AE  =0000003C                152  LOGO_Y                       equ 60
+000010AE                           153  
+000010AE  =000000F9                154  SNAKE_IMAGE_WIDTH            equ 249
+000010AE  =00000096                155  SNAKE_IMAGE_HEIGHT           equ 150
+000010AE  =000000FA                156  SNAKE_IMAGE_Y                equ 250
+000010AE                           157  
+000010AE  =000000DE                158  KEYS_WIDTH                   equ 222
+000010AE  =00000096                159  KEYS_HEIGHT                  equ 150
+000010AE  =000001A4                160  KEYS_Y                       equ 420
+000010AE                           161  
+000010AE  =00000064                162  SKULL_WIDTH                  equ 100
+000010AE  =00000058                163  SKULL_HEIGHT                 equ 88
+000010AE  =0000012C                164  SKULL_Y                      equ 300
+000010AE                           165  
+000010AE  =00003F0D                166  SCORE_TEXT_POSITION          equ $3F0D
+000010AE                           167  
+000010AE  =00000005                168  PEN_WIDTH                    equ 5
+000010AE  =00000003                169  THIN_PEN_WIDTH               equ 3
+000010AE                           170  
+000010AE  =00000190                171  SNAKE_CENTER__X              equ 400
+000010AE  =000000FA                172  SNAKE_CENTER__Y              equ 250
+000010AE  =0000000D                173  SNAKE_WIDTH                  equ 13
+000010AE  =0000000D                174  SNAKE_HEIGHT                 equ 13
+000010AE                           175  
+000010AE  =00000028                176  SNAKE_INITIAL_VELOCITY       equ 40
+000010AE                           177  
+000010AE  =005ABA9B                178  BACKGROUND_COLOR             equ $005ABA9B
+000010AE  =00FFFFFF                179  WHITE                        equ $FFFFFF
+000010AE  =00000000                180  BLACK                        equ $000000
+000010AE  =002B331A                181  DARK_GREEN                   equ $002B331A
+000010AE                           182  
+000010AE  =00000019                183  SCORE_BOX_FULL_X             equ 25
+000010AE  =0000023F                184  SCORE_BOX_FULL_Y             equ 575
+000010AE  =00000307                185  SCORE_BOX_FULL_WIDTH         equ 775
+000010AE  =000002A8                186  SCORE_BOX_FULL_HEIGHT        equ 680
+000010AE                           187  
+000010AE                           188  loadingScreen
+000010AE                           189       ;jsr clearRegisters
+000010AE  41F9 0000144C            190       lea LoadingText, a0
+000010B4  9FFC 0000001C            191       sub.l   #28, sp                                              ;7 arguments:
+000010BA  2F48 0000                192       move.l  a0,SET_POINTER_OFFSET(sp)                            ;d0= pointer to .bmp file 
+000010BE  2F7C 00000000 0004       193       move.l  #0,SET_CHUNK_X_OFFSET(sp)                            ;d1= top left corner x chunk
+000010C6  2F7C 00000000 0008       194       move.l  #0,SET_CHUNK_Y_OFFSET(sp)                            ;d2= top left corner y chunk
+000010CE  2F7C 00000113 000C       195       move.l  #LOADING_WIDTH,SET_CHUNK_WIDTH_OFFSET(sp)                   ;d3= width of bitmap chunk
+000010D6  2F7C 0000005E 0010       196       move.l  #LOADIND_HEIGHT,SET_CHUNK_HEIGHT_OFFSET(sp)                 ;d4= height of bitmap chunk
+000010DE  2F7C 00000106 0014       197       move.l  #(SCREEN_WIDTH-LOADING_WIDTH)>>1,SET_DISPLAY_X_OFFSET(sp)   ;d5= top left corner x display
+000010E6  2F7C 000000FA 0018       198       move.l  #LOADING_Y,SET_DISPLAY_Y_OFFSET(sp)                         ;d6= top left corner y display
+000010EE  4EB9 000FC6F2            199       jsr     drawChunk                                            ;call the subroutine to draw image
+000010F4  DFFC 0000001C            200       add.l   #28, sp                                              ;fix stack
+000010FA  4EB9 00001436            201       jsr swapScreen                                               ;jumps back when done loading
+00001100  4E75                     202       rts
+00001102                           203  
+00001102                           204  
+00001102                           205  titleScreen 
+00001102  4EB9 0000143E            206       jsr clearScreen
+00001108                           207       
+00001108  103C 0051                208       move.b #SET_FILL_COLOR_TRAP_CODE,d0               ;set fill color 
+0000110C  223C 005ABA9B            209       move.l #BACKGROUND_COLOR,d1   
+00001112  4E4F                     210       trap   #15
+00001114                           211      
+00001114  103C 0057                212       move.b #DRAW_RECTANGLE_TRAP_CODE,d0               ;fill screen with background color
+00001118  7200                     213       move.l #0,d1   
+0000111A  7400                     214       move.l #0,d2                           
+0000111C  263C 00000320            215       move.l #SCREEN_WIDTH,d3
+00001122  283C 000002BC            216       move.l #SCREEN_HEIGHT,d4                         
+00001128  4E4F                     217       trap   #15
+0000112A                           218      
+0000112A  41F9 0006E734            219       lea Logo, a0                                      ;draw logo on top 
+00001130  9FFC 0000001C            220       sub.l  #28, sp                            
+00001136  2F48 0000                221       move.l a0,SET_POINTER_OFFSET(sp)           
+0000113A  2F7C 00000000 0004       222       move.l #0,SET_CHUNK_X_OFFSET(sp)          
+00001142  2F7C 00000000 0008       223       move.l #0,SET_CHUNK_Y_OFFSET(sp)          
+0000114A  2F7C 000001A4 000C       224       move.l #LOGO_WIDTH,SET_CHUNK_WIDTH_OFFSET(sp)   
+00001152  2F7C 0000009C 0010       225       move.l #LOGO_HEIGHT,SET_CHUNK_HEIGHT_OFFSET(sp) 
+0000115A  2F7C 000000BE 0014       226       move.l #(SCREEN_WIDTH-LOGO_WIDTH)>>1,SET_DISPLAY_X_OFFSET(sp)     
+00001162  2F7C 0000003C 0018       227       move.l #LOGO_Y,SET_DISPLAY_Y_OFFSET(sp)       
+0000116A  4EB9 000FC6F2            228       jsr    drawChunk                          
+00001170  DFFC 0000001C            229       add.l  #28, sp                            
+00001176                           230       
+00001176  41F9 000CF2F2            231       lea SnakeImage, a0                                ;snake image in the middle
+0000117C  9FFC 0000001C            232       sub.l  #28, sp                            
+00001182  2F48 0000                233       move.l a0,SET_POINTER_OFFSET(sp)           
+00001186  2F7C 00000000 0004       234       move.l #0,SET_CHUNK_X_OFFSET(sp)          
+0000118E  2F7C 00000000 0008       235       move.l #0,SET_CHUNK_Y_OFFSET(sp)          
+00001196  2F7C 000000F9 000C       236       move.l #SNAKE_IMAGE_WIDTH,SET_CHUNK_WIDTH_OFFSET(sp)   
+0000119E  2F7C 00000096 0010       237       move.l #SNAKE_IMAGE_HEIGHT,SET_CHUNK_HEIGHT_OFFSET(sp) 
+000011A6  2F7C 00000113 0014       238       move.l #(SCREEN_WIDTH-SNAKE_IMAGE_WIDTH)>>1,SET_DISPLAY_X_OFFSET(sp)     
+000011AE  2F7C 000000FA 0018       239       move.l #SNAKE_IMAGE_Y,SET_DISPLAY_Y_OFFSET(sp)       
+000011B6  4EB9 000FC6F2            240       jsr    drawChunk                          
+000011BC  DFFC 0000001C            241       add.l  #28, sp
+000011C2                           242       
+000011C2  41F9 000AE72A            243       lea Keys, a0                                      ;WASD keys at the bottom
+000011C8                           244  
+000011C8  9FFC 0000001C            245       sub.l  #28, sp                            
+000011CE  2F48 0000                246       move.l a0,SET_POINTER_OFFSET(sp)           
+000011D2  2F7C 00000000 0004       247       move.l #0,SET_CHUNK_X_OFFSET(sp)          
+000011DA  2F7C 00000000 0008       248       move.l #0,SET_CHUNK_Y_OFFSET(sp)          
+000011E2  2F7C 000000DE 000C       249       move.l #KEYS_WIDTH,SET_CHUNK_WIDTH_OFFSET(sp)    
+000011EA  2F7C 00000096 0010       250       move.l #KEYS_HEIGHT,SET_CHUNK_HEIGHT_OFFSET(sp)  
+000011F2  2F7C 00000121 0014       251       move.l #(SCREEN_WIDTH-KEYS_WIDTH)>>1,SET_DISPLAY_X_OFFSET(sp)      
+000011FA  2F7C 000001A4 0018       252       move.l #KEYS_Y,SET_DISPLAY_Y_OFFSET(sp)      
+00001202  4EB9 000FC6F2            253       jsr    drawChunk                          
+00001208  DFFC 0000001C            254       add.l  #28, sp                            
+0000120E                           255       
+0000120E  43F9 000FC4E2            256       lea TitleText, a1                                 ;explains what keys to use
+00001214  223C 00000115            257       move.l #TITLE_TEXT_X, d1
+0000121A  243C 00000258            258       move.l #TITLE_TEXT_Y, d2
+00001220  103C 005F                259       move.b #SET_TEXT_POSITION_TRAP_CODE,d0
+00001224  4E4F                     260       trap   #15
+00001226                           261       
+00001226  43F9 000FC506            262       lea InstructionsText, a1                          ;explains how the game works
+0000122C  223C 000000B4            263       move.l #INS_TEXT_X, d1
+00001232  243C 0000028A            264       move.l #INS_TEXT_Y, d2
+00001238  103C 005F                265       move.b #SET_TEXT_POSITION_TRAP_CODE,d0
+0000123C  4E4F                     266       trap   #15
+0000123E                           267       
+0000123E  4EB9 00001436            268       jsr swapScreen
+00001244  4E75                     269       rts
+00001246                           270   
+00001246                           271  
+00001246                           272  gameScreen
+00001246  4EB8 1062                273       jsr clearRegisters
+0000124A  4EB9 0000143E            274       jsr clearScreen 
+00001250                           275   
+00001250  103C 0051                276       move.b #SET_FILL_COLOR_TRAP_CODE,d0               ;set fill color
+00001254  223C 005ABA9B            277       move.l #BACKGROUND_COLOR,d1   
+0000125A  4E4F                     278       trap #15
+0000125C                           279      
+0000125C  103C 0057                280       move.b #DRAW_RECTANGLE_TRAP_CODE,d0 
+00001260  7200                     281       move.l #0,d1   
+00001262  7400                     282       move.l #0,d2                           
+00001264  263C 00000320            283       move.l #SCREEN_WIDTH,d3
+0000126A  283C 000002BC            284       move.l #SCREEN_HEIGHT,d4                         
+00001270  4E4F                     285       trap   #15 
+00001272                           286      
+00001272  223C 002B331A            287       move.l #DARK_GREEN,d1                           ;draw our border for the game
+00001278  103C 0050                288       move.b #PEN_COLOR_TRAP_CODE,d0
+0000127C  4E4F                     289       trap   #15
+0000127E  103C 005D                290       move.b #PEN_WIDTH_TRAP_CODE,d0
+00001282  7205                     291       move.l #PEN_WIDTH,d1
+00001284  4E4F                     292       trap   #15 
+00001286  103C 005A                293       move.b #DRAW_UNFILLED_RECT,d0
+0000128A  7219                     294       move.l #GAME_BORDER_X, d1                       ;border starts at (25,20) and ends at (775,600)
+0000128C  7414                     295       move.l #GAME_BORDER_Y, d2
+0000128E  263C 00000307            296       move.l #GAME_BORDER_WIDTH,d3
+00001294  283C 00000258            297       move.l #GAME_BORDER_HEIGHT,d4
+0000129A  4E4F                     298       trap #15
+0000129C                           299     
+0000129C  48E7 FFFE                300       movem.l ALL_REG, -(sp)
+000012A0                           301      
+000012A0  103C 005D                302       move.b #PEN_WIDTH_TRAP_CODE,d0
+000012A4  7205                     303       move.l #PEN_WIDTH,d1
+000012A6  4E4F                     304       trap   #15
+000012A8  103C 0051                305       move.b #SET_FILL_COLOR_TRAP_CODE,d0             ;set fill color
+000012AC  223C 002B331A            306       move.l #DARK_GREEN,d1   
+000012B2  4E4F                     307       trap #15
+000012B4                           308      
+000012B4  103C 0057                309       move.b #DRAW_RECTANGLE_TRAP_CODE,d0             ;draw the score box
+000012B8  7219                     310       move.l #SCORE_BOX_FULL_X,d1   
+000012BA  243C 0000023F            311       move.l #SCORE_BOX_FULL_Y,d2
+000012C0  2601                     312       move.l d1,d3                              
+000012C2  263C 00000307            313       move.l #SCORE_BOX_FULL_WIDTH,d3
+000012C8  283C 000002A8            314       move.l #SCORE_BOX_FULL_HEIGHT,d4                         
+000012CE  4E4F                     315       trap   #15 
+000012D0                           316          
+000012D0  4CDF 7FFF                317       movem.l (sp)+,ALL_REG
+000012D4                           318      
+000012D4  103C 005D                319       move.b #PEN_WIDTH_TRAP_CODE,d0
+000012D8  7203                     320       move.l #THIN_PEN_WIDTH,d1
+000012DA  4E4F                     321       trap   #15
+000012DC                           322   
+000012DC  49F9 000FEB9A            323       lea Score, a4                                   ;initialize score to 0
+000012E2  7200                     324       move.l #0, d1
+000012E4  48D4 0002                325       movem.l d1,(a4)
+000012E8                           326  
+000012E8  4EB9 000FE846            327       jsr spawnFruit                                  ;spawn first fruit
+000012EE  4EB9 000FED02            328       jsr callScoreFunction                           ;draw score
+000012F4                           329      
+000012F4  2E3C 00001900            330       move.l #SNAKE_CENTER__X<<FRACTIONAL_BITS,d7     ;draw snake: d7= start x, d2= start y
+000012FA  45F9 000FC8E2            331       lea SnakeX,a2
+00001300  48D2 0080                332       movem.l d7,(a2)                                 ;save our head coordinate x to variable SnakeX
+00001304                           333      
+00001304  7C28                     334       move.l #SNAKE_INITIAL_VELOCITY,d6                       
+00001306  45F9 000FE83A            335       lea Velocity, a2
+0000130C  48D2 0040                336       movem.l d6,(a2)                                 ;save d6= velocity to variable Velocity
+00001310                           337      
+00001310  243C 00000FA0            338       move.l #SNAKE_CENTER__Y<<FRACTIONAL_BITS,d2      
+00001316  47F9 000FD882            339       lea SnakeY,a3
+0000131C  48D3 0004                340       movem.l d2,(a3)                                 ;save our head coordinate y to variable SnakeY
+00001320  2802                     341       move.l d2,d4                                    ;d4= end y
+00001322  0684 0000000D            342       add.l  #SNAKE_WIDTH,d4 
+00001328  45F9 000FE822            343       lea SnakeBodyLength, a2                         ;snake gets longer (snake length +20px)
+0000132E  4CD2 0040                344       movem.l (a2),d6
+00001332  0686 0000000A            345       addi.l #10,d6
+00001338  48D2 0040                346       movem.l d6,(a2)  
+0000133C  4EB9 000FEEA2            347       jsr updateBody                                  ;shift everything back once to make space for the head
+00001342                           348      
+00001342  103C 005D                349       move.b #PEN_WIDTH_TRAP_CODE,d0
+00001346  123C 0003                350       move.b #THIN_PEN_WIDTH,d1
+0000134A  4E4F                     351       trap   #15 
+0000134C  4EB9 000FEF00            352       jsr drawSnake
+00001352  4EB9 00001436            353       jsr swapScreen
+00001358  4E75                     354       rts 
+0000135A                           355      
+0000135A                           356      
+0000135A                           357  gameOverScreen
+0000135A  4EB9 0000143E            358      jsr clearScreen
+00001360                           359      
+00001360  103C 0051                360       move.b #SET_FILL_COLOR_TRAP_CODE,d0               ;set fill color
+00001364  223C 005ABA9B            361       move.l #BACKGROUND_COLOR,d1   
+0000136A  4E4F                     362       trap #15
+0000136C                           363      
+0000136C  103C 0057                364       move.b #DRAW_RECTANGLE_TRAP_CODE,d0 
+00001370  323C 0000                365       move.w  #0,d1   
+00001374  343C 0000                366       move.w  #0,d2                           
+00001378  363C 0320                367       move.w  #SCREEN_WIDTH,d3
+0000137C  383C 02BC                368       move.w #SCREEN_HEIGHT,d4                         
+00001380  4E4F                     369       trap   #15
+00001382                           370      
+00001382  43F9 000FC476            371       lea GameOverText, a1
+00001388  223C 00000122            372       move.l #GAME_OVER_TEXT_X, d1
+0000138E  243C 000000C3            373       move.l #GAME_OVER_TEXT_Y, d2
+00001394  103C 005F                374       move.b #SET_TEXT_POSITION_TRAP_CODE,d0
+00001398  4E4F                     375       trap #15
+0000139A                           376      
+0000139A  43F9 000FC496            377       lea RestartTitleText, a1
+000013A0  223C 000000FE            378       move.l #RESTART_TITLE_TEXT_X, d1
+000013A6  243C 000000DC            379       move.l #RESTART_TITLE_TEXT_Y, d2
+000013AC  103C 005F                380       move.b #SET_TEXT_POSITION_TRAP_CODE,d0
+000013B0  4E4F                     381       trap #15
+000013B2                           382      
+000013B2  43F9 000FC4C2            383       lea RestartGameText, a1
+000013B8  223C 00000122            384       move.l #RESTART_GAME_TEXT_X, d1
+000013BE  243C 000000F5            385       move.l #RESTART_GAME_TEXT_Y, d2
+000013C4  103C 005F                386       move.b #SET_TEXT_POSITION_TRAP_CODE,d0
+000013C8  4E4F                     387       trap #15
+000013CA                           388      
+000013CA  700B                     389       move.l #SET_CURSOR_TRAP_CODE,d0
+000013CC  223C 00003F0D            390       move.l #SCORE_TEXT_POSITION,d1
+000013D2  4E4F                     391       trap #15
+000013D4  7003                     392       move.l #DISPLAY_NUMBER_TRAP_CODE,d0
+000013D6  49F9 000FEB9A            393       lea Score, a4
+000013DC  4CD4 0002                394       movem.l (a4),d1
+000013E0  4E4F                     395       trap #15
+000013E2                           396  
+000013E2  41F9 000F3AC0            397       lea Skull, a0
+000013E8  9FFC 0000001C            398       sub.l   #28, sp                            
+000013EE  2F48 0000                399       move.l  a0,SET_POINTER_OFFSET(sp)           
+000013F2  2F7C 00000000 0004       400       move.l  #0,SET_CHUNK_X_OFFSET(sp)          
+000013FA  2F7C 00000000 0008       401       move.l  #0,SET_CHUNK_Y_OFFSET(sp)          
+00001402  2F7C 00000064 000C       402       move.l  #SKULL_WIDTH,SET_CHUNK_WIDTH_OFFSET(sp)    
+0000140A  2F7C 00000058 0010       403       move.l  #SKULL_HEIGHT,SET_CHUNK_HEIGHT_OFFSET(sp)  
+00001412  2F7C 0000015E 0014       404       move.l  #(SCREEN_WIDTH-SKULL_WIDTH)>>1,SET_DISPLAY_X_OFFSET(sp)      
+0000141A  2F7C 0000012C 0018       405       move.l  #SKULL_Y,SET_DISPLAY_Y_OFFSET(sp)      
+00001422  4EB9 000FC6F2            406       jsr     drawChunk                          
+00001428  DFFC 0000001C            407       add.l   #28, sp   
+0000142E                           408       
+0000142E  4EB9 00001436            409       jsr swapScreen
+00001434  4E75                     410       rts
+00001436                           411  
+00001436                           412  
+00001436                           413  swapScreen
+00001436  103C 005E                414       move.b  #REPAINT_SCREEN_TRAP_CODE, d0
+0000143A  4E4F                     415       trap    #15
+0000143C  4E75                     416       rts 
+0000143E                           417     
+0000143E                           418     
+0000143E                           419  clearScreen
+0000143E  103C 000B                420       move.b  #CLEAR_SCREEN_TRAP_CODE,d0
+00001442  223C 0000FF00            421       move.l  #$FF00,d1
+00001448  4E4F                     422       trap    #15
+0000144A  4E75                     423       rts
+0000144C                           424  
+0000144C                           425  
+0000144C                           426  
+0000144C                           427  LoadingText             INCBIN  'bitmaps\loading.bmp'
+0001A86A                           428  Background              INCBIN  'bitmaps\background.bmp'
+0006E734                           429  Logo                    INCBIN  'bitmaps\logo.bmp'
+000AE72A                           430  Keys                    INCBIN  'bitmaps\wasd_keys.bmp'
+000CEFB0                           431  Apple                   INCBIN  'bitmaps\fruit.bmp'
+000CF2F2                           432  SnakeImage              INCBIN  'bitmaps\snakeImage.bmp'
+000F3AC0                           433  Skull                   INCBIN  'bitmaps\skull.bmp'
+000FC476                           434  
+000FC476= 47616D65 206F7665 ...    435  GameOverText            dc.l    'Game over! Your score was: ',0 
+000FC496= 50726573 7320454E ...    436  RestartTitleText        dc.l    'Press ENTER to go back to title screen',0 
+000FC4C2= 50726573 73205350 ...    437  RestartGameText         dc.l    'Press SPACE to restart game',0 
+000FC4E2= 57415344 20746F20 ...    438  TitleText               dc.l    'WASD to move and SPACE to start',0  
+000FC506= 45617420 6170706C ...    439  InstructionsText        dc.l    'Eat apples, and avoid collision with the wall or yourself!',0
+000FC546                           440  
+000FC546                           441  
+000FC546                           442  
+000FC546                           443  
+000FC546                           444  
+000FC546                           445  
+000FC546                           446  
+000FC546                           447  
+000FC546                           448  
+000FC546                           449  
+000FC546                           450  
+000FC546                           451  
+000FC546                           452  
+000FC546                           453  
+000FC546                           454  
+000FC546                           455  
+000FC546                           456  
+000FC546                           457  
+000FC546                           458  
+000FC546                           459  
+000FC546                           460  
+000FC546                           461  
+000FC546                           462  
+000FC546                           463  
+000FC546                           464  
+000FC546                           465  
+000FC546                           466  
+000FC546                           467  
+000FC546                           468  
+000FC546                           469  
+000FC546                           470  -------------------- end include --------------------
+000FC546                           471      INCLUDE gameLoop.X68
+000FC546  =57415344                472  WASD_ASCII                  equ $57415344
+000FC546  =00000D20                473  ENTER_SPACE_ASCII           equ $00000D20
+000FC546  =00000013                474  CHECK_INPUT_TRAP_CODE       equ 19
+000FC546  =00000050                475  SPEED_CAP_VELOCITY          equ 80
+000FC546                           476  
+000FC546  =00000004                477  FRACTIONAL_BITS             equ 4
+000FC546  =00000008                478  GET_TIME_TRAP_CODE          equ 8
+000FC546                           479  
+000FC546                           480  
+000FC546                           481  startGameLoop:
+000FC546  23FC FFFFFFFF 000FE826   482      move.l #-1, MoveOffset                           ; mark current direction as uninitialized
+000FC550  23FC FFFFFFFF 000FE82E   483      move.l #-1, PreviousDirection
+000FC55A  4DF9 000FE832            484      lea NumberShifts,a6
+000FC560  263C 57415344            485      move.l #WASD_ASCII,d3                            ;wasd in ascii is 57 41 53 44                     
+000FC566  7A00                     486      move.l #0,d5                                     ;d5 keeps track of number of shifts
+000FC568  2C85                     487      move.l d5,(a6)
+000FC56A                           488     
+000FC56A                           489    
+000FC56A                           490  gameLoop:
+000FC56A  103C 0013                491      move.b #CHECK_INPUT_TRAP_CODE,d0
+000FC56E  2203                     492      move.l d3,d1                                     ;check if D was pressed
+000FC570  C2BC 000000FF            493      and.l #$00FF,d1
+000FC576  4E4F                     494      trap #15
+000FC578  0C01 0000                495      cmpi.b #00,d1                                    ;if key was pressed, call function. 
+000FC57C  6700 0006                496      beq noCall                                       ;Otherwise check other values
+000FC580  6000 0012                497      bra callFunction
+000FC584                           498  
+000FC584                           499  
+000FC584                           500  noCall:
+000FC584  5885                     501      add.l           #4,d5                            ;offset to next shift
+000FC586  2C85                     502      move.l d5,(a6)
+000FC588  E09B                     503      ror.l           #8,d3                            ;go to next value, 44574153, 53445741, etc
+000FC58A  0C85 00000010            504      cmpi.l          #16,d5                           ;if we checked all then reinitialize data
+000FC590  66D8                     505      bne             gameloop                
+000FC592  60B2                     506      bra             startGameLoop
+000FC594                           507  
+000FC594                           508      
+000FC594                           509  callFunction:
+000FC594                           510   
+000FC594                           511  move:
+000FC594  2A39 000FE832            512      move.l NumberShifts,d5                                      
+000FC59A  41F9 000FC8D2            513      lea MoveTable,a0                                 ;load up MoveTable
+000FC5A0  43F9 000FE82A            514      lea RequestedDirection,a1
+000FC5A6  2285                     515      move.l d5,(a1)                                   ;store requested direction
+000FC5A8                           516      
+000FC5A8                           517      * check if the requested move is valid (not reverse)
+000FC5A8  4EB9 000FC7C0            518      jsr checkValidMove
+000FC5AE                           519      
+000FC5AE                           520      * use the validated direction (either requested or current)
+000FC5AE  43F9 000FE826            521      lea MoveOffset,a1
+000FC5B4  2A11                     522      move.l (a1),d5                                   ;get the direction we'll actually use
+000FC5B6  2270 5000                523      move.l (a0,d5),a1                                ;offset to right function
+000FC5BA                           524      
+000FC5BA  103C 0008                525      move.b #GET_TIME_TRAP_CODE,d0
+000FC5BE  4E4F                     526      trap #15                                         ;d1 contains time in hundredths of a second since midnight
+000FC5C0  45F9 000FE83E            527      lea PrevTime, a2 
+000FC5C6  48D2 0002                528      movem.l d1, (a2)                                 ;set as previous time
+000FC5CA                           529      
+000FC5CA  47F9 000FE83A            530      lea Velocity, a3
+000FC5D0  4CD3 0040                531      movem.l (a3),d6 
+000FC5D4                           532  
+000FC5D4  103C 0008                533      move.b #GET_TIME_TRAP_CODE,d0
+000FC5D8  4E4F                     534      trap #15                                        
+000FC5DA  45F9 000FE842            535      lea CurrTime, a2
+000FC5E0  48D2 0002                536      movem.l d1, (a2)                                 ;set as current time (might need to move)
+000FC5E4  0C86 00000050            537      cmpi.l #SPEED_CAP_VELOCITY,d6                    ;cap speed
+000FC5EA  6E00 001E                538      bgt capped
+000FC5EE                           539      
+000FC5EE  2239 000FE842            540      move.l CurrTime, d1                              ;set as current time
+000FC5F4  2439 000FE83E            541      move.l PrevTime, d2                              
+000FC5FA  B481                     542      cmp.l d1,d2                                      ;is it the same? (prevent snake from stopping)
+000FC5FC  6700 000C                543      beq capped
+000FC600                           544      
+000FC600  223C 00000004            545      move.l #(CurrTime-PrevTime),d1
+000FC606  E889                     546      lsr.l #FRACTIONAL_BITS,d1
+000FC608  CCC1                     547      mulu d1,d6                                       ;time based = velocity*(time elapsed)
+000FC60A                           548  
+000FC60A                           549  capped:        
+000FC60A  4EB9 000FEF7A            550      jsr replaceBackground                            ;replace where our snake moved
+000FC610                           551      
+000FC610  4EB9 000FEA90            552      jsr wallCollisionCheck                           ;check if we hit a wall,self, or fruit
+000FC616  4EB9 000FEAF4            553      jsr selfCollisionCheck
+000FC61C  4EB9 000FE9E2            554      jsr fruitCollisionCheck
+000FC622                           555      
+000FC622  1039 000FEB96            556      move.b CollisionFlag,d0
+000FC628  0C00 0001                557      cmpi.b #1,d0
+000FC62C  6700 0082                558      beq exitGame
+000FC630                           559      
+000FC630  4EB9 000FEEA2            560      jsr updateBody                                   ;shift coordinates to replace previous positions
+000FC636                           561      
+000FC636  2A39 000FE826            562      move.l MoveOffset,d5
+000FC63C  4E91                     563      jsr (a1)                                         ;update snake head position by moving in WASD direction                         
+000FC63E                           564      
+000FC63E  4EB9 000FEF00            565      jsr drawSnake                                    ;draw snake
+000FC644  4EB8 1436                566      jsr swapScreen
+000FC648                           567      
+000FC648  263C 57415344            568      move.l #WASD_ASCII,d3
+000FC64E  103C 0013                569      move.b #CHECK_INPUT_TRAP_CODE,d0
+000FC652  2203                     570      move.l d3,d1                                     ;check if no press (all 0)
+000FC654  4E4F                     571      trap   #15
+000FC656  0C81 00000000            572      cmpi.l #00,d1                                    ;if no keys were pressed, no change
+000FC65C  6700 FF36                573      beq move    
+000FC660                           574      
+000FC660  2239 000FE836            575      move.l SoundFlag, d1                             ;if sound flag is activated, play sound
+000FC666  0C81 00000001            576      cmpi.l #1,d1
+000FC66C  6600 0008                577      bne reinitialize
+000FC670  4EB9 000FEBAC            578      jsr playTurnSound
+000FC676                           579      
+000FC676                           580      *otherwise check for next input
+000FC676                           581  reinitialize:
+000FC676  4DF9 000FE832            582      lea NumberShifts,a6
+000FC67C  7A00                     583      move.l #0, d5
+000FC67E  263C 57415344            584      move.l #WASD_ASCII,d3
+000FC684                           585  checkOtherInput:
+000FC684  103C 0013                586      move.b #CHECK_INPUT_TRAP_CODE,d0
+000FC688  2203                     587      move.l d3,d1                                     ;check if D was pressed
+000FC68A  C2BC 000000FF            588      and.l #$00FF,d1
+000FC690  4E4F                     589      trap #15
+000FC692  0C01 0000                590      cmpi.b #00,d1                                    ;if key was pressed, call function.
+000FC696  6700 0008                591      beq offsetting                                   ;Otherwise check other values
+000FC69A  2C85                     592      move.l d5,(a6)
+000FC69C  6000 FEF6                593      bra callFunction
+000FC6A0                           594      
+000FC6A0                           595  offsetting:
+000FC6A0  5885                     596      add.l #4,d5                                      ;offset to next shift
+000FC6A2  E09B                     597      ror.l #8,d3                                      ;go to next value, 44574153, 53445741, etc
+000FC6A4  0C85 00000010            598      cmpi.l #16,d5                                    ;if we checked all then reinitialize data
+000FC6AA  66D8                     599      bne checkOtherInput
+000FC6AC  6000 FEE6                600      bra callFunction
+000FC6B0                           601    
+000FC6B0                           602      
+000FC6B0                           603  exitGame:
+000FC6B0  4EB8 135A                604      jsr gameOverScreen  
+000FC6B4  4EB9 000FEB9E            605      jsr playCollisionSound
+000FC6BA  4EB8 1074                606      jsr clearMemory   
+000FC6BE  4EB8 1062                607      jsr clearRegisters
+000FC6C2  243C 00000D20            608      move.l #ENTER_SPACE_ASCII,d2            ;enter key=D space key=20
+000FC6C8                           609      
+000FC6C8                           610  check:                     
+000FC6C8  103C 0013                611      move.b #CHECK_INPUT_TRAP_CODE,d0
+000FC6CC  2202                     612      move.l d2,d1                            ;check if enter was pressed
+000FC6CE  4E4F                     613      trap #15
+000FC6D0                           614      
+000FC6D0  2C3C 0000FF00            615      move.l #$FF00,d6 
+000FC6D6  B286                     616      cmp.l d6,d1
+000FC6D8  6700 0010                617      beq goToTitle                           ;goes back to title screen
+000FC6DC                           618      
+000FC6DC  2C3C 000000FF            619      move.l #$00FF,d6                        ;check if space was pressed
+000FC6E2  B286                     620      cmp.l d6, d1
+000FC6E4  6700 0008                621      beq goToGame                            ;goes back to game screen
+000FC6E8                           622      
+000FC6E8  60DE                     623      bra check
+000FC6EA                           624      
+000FC6EA                           625  goToTitle:
+000FC6EA  4EF8 101C                626      jmp restart                             ;goes back to title screen
+000FC6EE                           627  
+000FC6EE                           628  goToGame:
+000FC6EE  4EF8 1034                629      jmp enterGame                           ;goes back to game screen
+000FC6F2                           630  
+000FC6F2                           631  
+000FC6F2                           632  
+000FC6F2                           633  
+000FC6F2                           634  
+000FC6F2                           635  
+000FC6F2                           636  
+000FC6F2                           637  
+000FC6F2                           638  
+000FC6F2                           639  
+000FC6F2                           640  
+000FC6F2                           641  
+000FC6F2                           642  
+000FC6F2                           643  
+000FC6F2                           644  
+000FC6F2                           645  
+000FC6F2                           646  
+000FC6F2                           647  
+000FC6F2                           648  
+000FC6F2                           649  
+000FC6F2                           650  
+000FC6F2                           651  -------------------- end include --------------------
+000FC6F2                           652      INCLUDE bitmapSubroutine.X68
+000FC6F2                           653  
+000FC6F2  =00000050                654  PEN_COLOR_TRAP_CODE             EQU     80
+000FC6F2  =00000052                655  DRAW_PIXEL_TRAP_CODE            EQU     82
+000FC6F2                           656  
+000FC6F2                           657  
+000FC6F2  =00000000                658  SET_POINTER_OFFSET              EQU     0
+000FC6F2  =00000004                659  SET_CHUNK_X_OFFSET              EQU     4
+000FC6F2  =00000008                660  SET_CHUNK_Y_OFFSET              EQU     8
+000FC6F2  =0000000C                661  SET_CHUNK_WIDTH_OFFSET          EQU     12
+000FC6F2  =00000010                662  SET_CHUNK_HEIGHT_OFFSET         EQU     16
+000FC6F2  =00000014                663  SET_DISPLAY_X_OFFSET            EQU     20
+000FC6F2  =00000018                664  SET_DISPLAY_Y_OFFSET            EQU     24
+000FC6F2                           665  
+000FC6F2  =00000004                666  GET_POINTER_OFFSET              EQU     4
+000FC6F2  =00000008                667  GET_CHUNK_X_OFFSET              EQU     8
+000FC6F2  =0000000C                668  GET_CHUNK_Y_OFFSET              EQU     12
+000FC6F2  =00000010                669  GET_CHUNK_WIDTH_OFFSET          EQU     16
+000FC6F2  =00000014                670  GET_CHUNK_HEIGHT_OFFSET         EQU     20
+000FC6F2  =00000018                671  GET_DISPLAY_X_OFFSET            EQU     24
+000FC6F2  =0000001C                672  GET_DISPLAY_Y_OFFSET            EQU     28
+000FC6F2                           673  
+000FC6F2  =0000001C                674  GET_BITS_OFFSET                 EQU     $1C
+000FC6F2  =0000000A                675  GET_IMAGE_DATA_OFFSET           EQU     $0A
+000FC6F2  =00000012                676  GET_BITMAP_WIDTH_OFFSET         EQU     $12
+000FC6F2  =00000016                677  GET_BITMAP_HEIGHT_OFFSET        EQU     $16
+000FC6F2                           678  
+000FC6F2  =00000020                679  THIRTYTWOBITPIX                 EQU     32
+000FC6F2                           680    
+000FC6F2                           681        
+000FC6F2                           682  
+000FC6F2                           683  drawChunk
+000FC6F2  202F 0004                684       move.l GET_POINTER_OFFSET(sp),d0
+000FC6F6  2040                     685       move.l d0,a0                                   ;a0 now contains value from d0 (pointer)
+000FC6F8  222F 0008                686       move.l  GET_CHUNK_X_OFFSET(sp),d1              ;d1=chunk x coordinate
+000FC6FC  242F 000C                687       move.l  GET_CHUNK_Y_OFFSET(sp),d2              ;d2=chunk y coordinate
+000FC700                           688       
+000FC700  4280                     689       clr.l d0
+000FC702  3028 001C                690       move.w GET_BITS_OFFSET(a0),d0                  ;d0 stores the number of bits per pixel (32)
+000FC706  E058                     691       ror.w #8, d0
+000FC708                           692     
+000FC708  2628 000A                693       move.l GET_IMAGE_DATA_OFFSET(a0),d3            ;d3 stores the offset where the image data starts
+000FC70C  2F03                     694       move.l d3, -(sp)
+000FC70E  4EB9 000FC7B4            695       jsr endianSwap
+000FC714  2607                     696       move.l d7, d3
+000FC716  588F                     697       add.l #4,sp  
+000FC718                           698      
+000FC718  2C28 0012                699       move.l GET_BITMAP_WIDTH_OFFSET(a0),d6          ;d6 stores bitmap width total
+000FC71C  2F06                     700       move.l d6, -(sp)
+000FC71E  4EB9 000FC7B4            701       jsr endianSwap
+000FC724  2C07                     702       move.l d7, d6
+000FC726  588F                     703       add.l #4,sp
+000FC728                           704      
+000FC728  2A28 0016                705       move.l GET_BITMAP_HEIGHT_OFFSET(a0),d5         ;d5 stores bitmap height total
+000FC72C  2F05                     706       move.l d5, -(sp)
+000FC72E  4EB9 000FC7B4            707       jsr endianSwap
+000FC734  2A07                     708       move.l d7, d5
+000FC736  588F                     709       add.l #4,sp
+000FC738                           710      
+000FC738  D1C3                     711       adda.l  d3, a0                                 ;move to image data
+000FC73A                           712       
+000FC73A  B07C 0020                713       cmp.w #THIRTYTWOBITPIX, d0                     ;32 bit picture? 00BBGGRR
+000FC73E  6700 0006                714       beq thirtyTwoBitChunk
+000FC742  6000 006E                715       bra exitChunk                                  ;if not 32-bit, exit
+000FC746                           716  
+000FC746                           717      
+000FC746                           718  thirtyTwoBitChunk:
+000FC746                           719       * (bitmap width*4)*(bitmap height-(y coord + chunk height)) offset to right pixel in original image
+000FC746  2606                     720       move.l d6,d3
+000FC748  E58B                     721       lsl.l #2, d3                                   ;bitmap width *4
+000FC74A                           722       
+000FC74A  282F 0014                723       move.l  GET_CHUNK_HEIGHT_OFFSET(sp),d4         ;d4=height chunk
+000FC74E  D882                     724       add.l d2, d4                                   ;y coord + chunk height
+000FC750  9A84                     725       sub.l d4, d5                                   ;bmap height-(y coord + chunk height)
+000FC752                           726  
+000FC752  CAC3                     727       mulu d3, d5                                    ;finish eqn
+000FC754                           728    
+000FC754  D1C5                     729       adda.l  d5, a0                                 ;offset to right chunk
+000FC756  E589                     730       lsl.l #2, d1
+000FC758  D1C1                     731       adda.l d1, a0                                  ;offset to correct x position
+000FC75A                           732       
+000FC75A  262F 0010                733       move.l  GET_CHUNK_WIDTH_OFFSET(sp),d3          ;d3=width chunk
+000FC75E  2E06                     734       move.l d6, d7                                  ;d7 has bitmap total width
+000FC760  9E83                     735       sub.l d3, d7                                   ;(total width-chunk width)*4
+000FC762  E58F                     736       lsl.l #2, d7                                   ;d7 is our offset per row
+000FC764                           737       
+000FC764  2A2F 0018                738       move.l  GET_DISPLAY_X_OFFSET(sp),d5            ;d5=display x
+000FC768  2C2F 001C                739       move.l  GET_DISPLAY_Y_OFFSET(sp),d6            ;d6=display y
+000FC76C                           740       
+000FC76C  D685                     741       add.l d5, d3                                   ;total width (display x coordinate +width chunk)
+000FC76E  282F 0014                742       move.l  GET_CHUNK_HEIGHT_OFFSET(sp),d4
+000FC772  D886                     743       add.l d6, d4                                   ;total height (display y coordinate + height chunk)
+000FC774                           744  
+000FC774  4281                     745       clr.l d1
+000FC776  70FF                     746       move.l #$FFFFFFFF, d0                          ;d0 will store last color (start with invalid value)
+000FC778                           747       
+000FC778                           748  continueRow2Chunk:       
+000FC778  2218                     749       move.l  (a0)+,d1                               
+000FC77A  B23C 0000                750       cmp.b #$00,d1                                  ;check alpha channel for transparency. If 00 then skip
+000FC77E  6700 001C                751       beq skip
+000FC782  E089                     752       lsr.l #8, d1                                   ;getting to right format 00BBGGRR
+000FC784                           753       
+000FC784  B280                     754       cmp.l d0, d1                                   ;same color as last pixel?
+000FC786  6700 000A                755       beq sameColor                                  ;if yes, skip setting pen color
+000FC78A  2001                     756       move.l d1, d0                                  ;store new color
+000FC78C  7050                     757       move.l  #PEN_COLOR_TRAP_CODE, d0               ;set the pen color       
+000FC78E  4E4F                     758       trap    #15
+000FC790  2001                     759       move.l d1, d0                                  ;restore color to d0
+000FC792                           760       
+000FC792                           761  sameColor:
+000FC792  2205                     762       move.l  d5,d1                                  
+000FC794  2404                     763       move.l  d4,d2                                  
+000FC796  7052                     764       move.l  #DRAW_PIXEL_TRAP_CODE,d0               ;draw pixel at (x,y)
+000FC798  4E4F                     765       trap #15
+000FC79A  2001                     766       move.l d1, d0                                  ;restore last color to d0
+000FC79C                           767       
+000FC79C                           768  skip:
+000FC79C  5285                     769       addi.l  #1,d5                                  ;move to next pixel in the row
+000FC79E  B685                     770       cmp.l   d5,d3                                  ;reached end row? if not, continue printing row
+000FC7A0  66D6                     771       bne     continueRow2Chunk
+000FC7A2                           772       
+000FC7A2  2A2F 0018                773       move.l  GET_DISPLAY_X_OFFSET(sp),d5            ;reset to beginning of col   
+000FC7A6  5384                     774       subi.l  #1,d4                                  ;move to next row
+000FC7A8  D1C7                     775       adda.l d7,a0                                   ;offset next row
+000FC7AA  B886                     776       cmp.l  d6,d4                                   ;reached end height?
+000FC7AC  66CA                     777       bne     continueRow2Chunk                      ;if not, continue printing
+000FC7AE  6700 0002                778       beq exitChunk     
+000FC7B2                           779  
+000FC7B2                           780  exitChunk:
+000FC7B2  4E75                     781       rts
+000FC7B4                           782           
+000FC7B4                           783  
+000FC7B4                           784  endianSwap
+000FC7B4  2E2F 0004                785      move.l  4(sp),d7
+000FC7B8  E05F                     786      ror.w #8, d7
+000FC7BA  4847                     787      swap d7
+000FC7BC  E05F                     788      ror.w #8, d7 ;d7 is our return value
+000FC7BE  4E75                     789      rts
+000FC7C0                           790      
+000FC7C0                           791      
+000FC7C0                           792  
+000FC7C0                           793  
+000FC7C0                           794  
+000FC7C0                           795  
+000FC7C0                           796  
+000FC7C0                           797  
+000FC7C0                           798  
+000FC7C0                           799  
+000FC7C0                           800  
+000FC7C0                           801  
+000FC7C0                           802  
+000FC7C0                           803  
+000FC7C0                           804  
+000FC7C0                           805  
+000FC7C0                           806  
+000FC7C0                           807  
+000FC7C0                           808  
+000FC7C0                           809  -------------------- end include --------------------
+000FC7C0                           810      INCLUDE playerMovement.X68
+000FC7C0  =0000000C                811  UP_OFFSET                       equ     12 
+000FC7C0  =00000008                812  LEFT_OFFSET                     equ     8 
+000FC7C0  =00000004                813  DOWN_OFFSET                     equ     4 
+000FC7C0  =00000000                814  RIGHT_OFFSET                    equ     0 
+000FC7C0                           815  
+000FC7C0                           816  
+000FC7C0                           817  checkValidMove:
+000FC7C0  48E7 FFFE                818      movem.l ALL_REG, -(sp)                           ;save all registers
+000FC7C4                           819      
+000FC7C4  2039 000FE82A            820      move.l RequestedDirection, d0                    ;get requested direction
+000FC7CA  2239 000FE826            821      move.l MoveOffset, d1                            ;get current direction
+000FC7D0                           822      
+000FC7D0  0C81 FFFFFFFF            823      cmpi.l #-1, d1                                   ;if first move, allow any direction
+000FC7D6  6700 0024                824      beq useRequestedMove
+000FC7DA                           825      
+000FC7DA                           826      * check for reverse moves using our offsets
+000FC7DA                           827      * UP (12) and DOWN (4): difference is 8
+000FC7DA                           828      * LEFT (8) and RIGHT (0): difference is 8
+000FC7DA                           829      
+000FC7DA  2400                     830      move.l d0, d2
+000FC7DC  9481                     831      sub.l d1, d2                                     ;d2 = requested - current
+000FC7DE                           832      
+000FC7DE                           833      * check if difference is 8 (reverse move) or 0 (same move)
+000FC7DE  0C82 00000008            834      cmpi.l #8, d2
+000FC7E4  6700 0034                835      beq keepCurrentMove                          
+000FC7E8  0C82 FFFFFFF8            836      cmpi.l #-8, d2
+000FC7EE  6700 002A                837      beq keepCurrentMove                            
+000FC7F2  0C82 00000000            838      cmpi.l #0, d2
+000FC7F8  6700 0020                839      beq keepCurrentMove
+000FC7FC                           840      
+000FC7FC                           841      * not a reverse or current move, use requested direction
+000FC7FC                           842  useRequestedMove:
+000FC7FC  23C0 000FE826            843      move.l d0, MoveOffset                            ;update current direction
+000FC802  23F9 000FE826 000FE82E   844      move.l MoveOffset, PreviousDirection             ;update previous direction
+000FC80C  23FC 00000001 000FE836   845      move.l #1, SoundFlag                             ;set flag: valid move made (play sound)
+000FC816  6000 000C                846      bra checkValidMoveEnd
+000FC81A                           847      
+000FC81A                           848  keepCurrentMove:
+000FC81A  23FC 00000000 000FE836   849       move.l #0, SoundFlag                            ;otherwise, keep current move
+000FC824                           850       
+000FC824                           851  checkValidMoveEnd:
+000FC824  4CDF 7FFF                852      movem.l (sp)+, ALL_REG                           ;restore all registers
+000FC828  4E75                     853      rts
+000FC82A                           854  
+000FC82A                           855  moveUp   
+000FC82A  47F9 000FD882            856      lea SnakeY,a3
+000FC830  4CD3 0001                857      movem.l (a3),d0
+000FC834  9086                     858      sub.l   d6,d0                                    ;subtract velocity to y position   
+000FC836  48D3 0001                859      movem.l d0,(a3) 
+000FC83A                           860  
+000FC83A  4BF9 000FE826            861      lea MoveOffset,a5                                ;keeping track of our current move
+000FC840  2ABC 0000000C            862      move.l #UP_OFFSET,(a5)
+000FC846  4BF9 000FE82E            863      lea PreviousDirection,a5                         ;update previous direction
+000FC84C  2ABC 0000000C            864      move.l #UP_OFFSET,(a5)
+000FC852  4E75                     865      rts
+000FC854                           866      
+000FC854                           867      
+000FC854                           868  moveLeft 
+000FC854  47F9 000FC8E2            869      lea SnakeX,a3
+000FC85A  4CD3 0080                870      movem.l (a3),d7
+000FC85E  9E86                     871      sub.l   d6,d7                                    ;subtract velocity to x position   
+000FC860  48D3 0080                872      movem.l d7,(a3) 
+000FC864                           873  
+000FC864  4BF9 000FE826            874      lea MoveOffset,a5
+000FC86A  2ABC 00000008            875      move.l #LEFT_OFFSET,(a5)
+000FC870  4BF9 000FE82E            876      lea PreviousDirection,a5                         ;update previous direction
+000FC876  2ABC 00000008            877      move.l #LEFT_OFFSET,(a5)    
+000FC87C  4E75                     878      rts
+000FC87E                           879  
+000FC87E                           880  
+000FC87E                           881  moveDown 
+000FC87E  47F9 000FD882            882      lea SnakeY,a3
+000FC884  4CD3 0001                883      movem.l (a3),d0
+000FC888  D086                     884      add.l   d6,d0                                    ;add velocity to y position    
+000FC88A  48D3 0001                885      movem.l d0,(a3)
+000FC88E                           886       
+000FC88E  4BF9 000FE826            887      lea MoveOffset,a5
+000FC894  2ABC 00000004            888      move.l #DOWN_OFFSET,(a5)
+000FC89A  4BF9 000FE82E            889      lea PreviousDirection,a5                         ;update previous direction
+000FC8A0  2ABC 00000004            890      move.l #DOWN_OFFSET,(a5) 
+000FC8A6  4E75                     891      rts  
+000FC8A8                           892      
+000FC8A8                           893      
+000FC8A8                           894  moveRight 
+000FC8A8  47F9 000FC8E2            895      lea SnakeX,a3
+000FC8AE  4CD3 0080                896      movem.l (a3),d7
+000FC8B2  DE86                     897      add.l   d6,d7                                    ;add velocity to x position    
+000FC8B4  48D3 0080                898      movem.l d7,(a3)
+000FC8B8                           899      
+000FC8B8  4BF9 000FE826            900      lea MoveOffset,a5
+000FC8BE  2ABC 00000000            901      move.l #RIGHT_OFFSET,(a5)
+000FC8C4  4BF9 000FE82E            902      lea PreviousDirection,a5                         ;update previous direction
+000FC8CA  2ABC 00000000            903      move.l #RIGHT_OFFSET,(a5)  
+000FC8D0  4E75                     904      rts  
+000FC8D2                           905      
+000FC8D2                           906  
+000FC8D2                           907  
+000FC8D2= 000FC8A8 000FC87E ...    908  MoveTable               dc.l    moveRight,moveDown,moveLeft,moveUp  
+000FC8E2                           909  
+000FC8E2                           910  SnakeX                  ds.l    1000
+000FD882                           911  SnakeY                  ds.l    1000
+000FE822= 00000001                 912  SnakeBodyLength         dc.l    1
+000FE826                           913  
+000FE826= FFFFFFFF                 914  MoveOffset              dc.l    -1
+000FE82A                           915  RequestedDirection      ds.l    1
+000FE82E                           916  PreviousDirection       ds.l    1
+000FE832                           917  NumberShifts            ds.l    1
+000FE836                           918  SoundFlag               ds.l    1
+000FE83A                           919  
+000FE83A                           920  Velocity                ds.l    1
+000FE83E                           921  PrevTime                ds.l    1  
+000FE842                           922  CurrTime                ds.l    1  
+000FE846                           923  
+000FE846                           924  
+000FE846                           925  
+000FE846                           926  
+000FE846                           927  
+000FE846                           928  
+000FE846                           929  
+000FE846                           930  
+000FE846                           931  
+000FE846                           932  
+000FE846                           933  
+000FE846                           934  
+000FE846                           935  
+000FE846                           936  
+000FE846                           937  
+000FE846                           938  
+000FE846                           939  
+000FE846                           940  
+000FE846                           941  
+000FE846                           942  
+000FE846                           943  
+000FE846                           944  
+000FE846                           945  
+000FE846                           946  
+000FE846                           947  
+000FE846                           948  
+000FE846                           949  
+000FE846                           950  
+000FE846                           951  
+000FE846                           952  -------------------- end include --------------------
+000FE846                           953      INCLUDE randomFruitSpawn.X68
+000FE846  =00000053                954  GET_PIXEL_COLOR_TRAP_CODE equ 83
+000FE846                           955  
+000FE846                           956  spawnFruit
+000FE846                           957  getNew:
+000FE846                           958      *get words
+000FE846  4EB9 000FE996            959      jsr getRandomLongIntoD6
+000FE84C  2206                     960      move.l d6, d1                                    ;d1 holds x
+000FE84E  4241                     961      clr.w d1
+000FE850  4841                     962      swap d1
+000FE852                           963  
+000FE852  2406                     964      move.l d6,d2                                     ;d2 holds y
+000FE854  4842                     965      swap d2
+000FE856  4242                     966      clr.w d2
+000FE858  4842                     967      swap d2
+000FE85A                           968      
+000FE85A                           969      * make sure the word is within border bounds 
+000FE85A  82FC 0060                970      divu #96,d1                                      ;fit within left and right side of screen
+000FE85E  4841                     971      swap d1
+000FE860  4241                     972      clr.w d1
+000FE862  4841                     973      swap d1                                 
+000FE864  0681 00000028            974      addi.l #(LEFT_SIDE_OF_SCREEN+10),d1              ;space between border
+000FE86A  EE8A                     975      lsr.l #7,d2                                  
+000FE86C  0682 00000023            976      addi.l #(UP_SIDE_OF_SCREEN+10),d2
+000FE872                           977      
+000FE872  4BF9 000FE9DA            978      lea xCoordFruit, a5
+000FE878  4DF9 000FE9DE            979      lea yCoordFruit, a6
+000FE87E  2A81                     980      move.l d1, (a5)                                  ;save fruit coords in memory
+000FE880  2C82                     981      move.l d2, (a6)
+000FE882                           982      
+000FE882                           983      * check 1: upper left hitbox 
+000FE882  7053                     984      move.l #GET_PIXEL_COLOR_TRAP_CODE, d0             
+000FE884  4E4F                     985      trap #15                                         
+000FE886  B0BC 002B331A            986      cmp.l #DARK_GREEN, d0                           
+000FE88C  67B8                     987      beq getnew                                       ;early exit on collision
+000FE88E                           988      
+000FE88E                           989      * check 2: upper right of hitbox
+000FE88E  2239 000FE9DA            990      move.l xCoordFruit, d1                           ;restore x and y starting coords
+000FE894  2439 000FE9DE            991      move.l yCoordFruit, d2  
+000FE89A  0681 0000000D            992      add.l #(FRUIT_WIDTH),d1                          ;upper right x
+000FE8A0  7053                     993      move.l #GET_PIXEL_COLOR_TRAP_CODE, d0             
+000FE8A2  4E4F                     994      trap #15                                         
+000FE8A4  B0BC 002B331A            995      cmp.l #DARK_GREEN, d0                           
+000FE8AA  679A                     996      beq getnew                                       ;early exit on collision
+000FE8AC                           997      
+000FE8AC                           998      * check 3: lower right of hitbox
+000FE8AC  2239 000FE9DA            999      move.l xCoordFruit, d1                           ;restore x and y starting coords
+000FE8B2  2439 000FE9DE           1000      move.l yCoordFruit, d2  
+000FE8B8  0681 0000000D           1001      add.l #(FRUIT_WIDTH),d1                          ;lower right x
+000FE8BE  0682 0000000F           1002      add.l #(FRUIT_HEIGHT),d2                         ;lower right y
+000FE8C4  7053                    1003      move.l #GET_PIXEL_COLOR_TRAP_CODE, d0             
+000FE8C6  4E4F                    1004      trap #15                                         
+000FE8C8  B0BC 002B331A           1005      cmp.l #DARK_GREEN, d0                           
+000FE8CE  6700 FF76               1006      beq getnew                                       ;early exit on collision
+000FE8D2                          1007          
+000FE8D2                          1008      * check 4: lower left of hitbox
+000FE8D2  2239 000FE9DA           1009      move.l xCoordFruit, d1                           ;restore x and y starting coords
+000FE8D8  2439 000FE9DE           1010      move.l yCoordFruit, d2  
+000FE8DE  0682 0000000F           1011      add.l #(FRUIT_HEIGHT),d2                         ;lower left y
+000FE8E4  7053                    1012      move.l #GET_PIXEL_COLOR_TRAP_CODE, d0             
+000FE8E6  4E4F                    1013      trap #15                                         
+000FE8E8  B0BC 002B331A           1014      cmp.l #DARK_GREEN, d0                           
+000FE8EE  6700 FF56               1015      beq getnew                                       ;early exit on collision
+000FE8F2                          1016      
+000FE8F2                          1017      
+000FE8F2                          1018      * all checks passed - restore original coordinates and draw
+000FE8F2  2239 000FE9DA           1019      move.l xCoordFruit, d1                         
+000FE8F8  2439 000FE9DE           1020      move.l yCoordFruit, d2  
+000FE8FE                          1021      
+000FE8FE                          1022      * draw the fruit at generated location  
+000FE8FE  41F9 000CEFB0           1023      lea Apple, a0
+000FE904  9FFC 0000001C           1024      sub.l   #28, sp                                     
+000FE90A  2F48 0000               1025      move.l  a0,SET_POINTER_OFFSET(sp)                   
+000FE90E  2F7C 00000000 0004      1026      move.l  #0,SET_CHUNK_X_OFFSET(sp)                   
+000FE916  2F7C 00000000 0008      1027      move.l  #0,SET_CHUNK_Y_OFFSET(sp)                   
+000FE91E  2F7C 0000000D 000C      1028      move.l  #FRUIT_WIDTH,SET_CHUNK_WIDTH_OFFSET(sp)     
+000FE926  2F7C 0000000F 0010      1029      move.l  #FRUIT_HEIGHT,SET_CHUNK_HEIGHT_OFFSET(sp)   
+000FE92E  2F41 0014               1030      move.l  d1,SET_DISPLAY_X_OFFSET(sp)                 
+000FE932  2F42 0018               1031      move.l  d2,SET_DISPLAY_Y_OFFSET(sp)                 
+000FE936  4EB9 000FC6F2           1032      jsr     drawChunk                                   
+000FE93C  DFFC 0000001C           1033      add.l   #28, sp                                     
+000FE942  4E75                    1034      rts
+000FE944                          1035  
+000FE944                          1036  
+000FE944                          1037  seedRandomNumber
+000FE944  48E7 FFFE               1038      movem.l ALL_REG,-(sp)    
+000FE948  4286                    1039      clr.l   d6
+000FE94A  103C 0008               1040      move.b  #GET_TIME_TRAP_CODE,d0
+000FE94E  4E4F                    1041      TRAP    #15
+000FE950                          1042  
+000FE950  23C1 000FE9D2           1043      move.l  d1,RANDOMVAL
+000FE956  4CDF 7FFF               1044      movem.l (sp)+,ALL_REG
+000FE95A  4E75                    1045      rts
+000FE95C                          1046  
+000FE95C                          1047  getRandomByteIntoD6
+000FE95C  48E7 8000               1048      movem.l d0,-(sp)
+000FE960  48E7 4000               1049      movem.l d1,-(sp)
+000FE964  48E7 2000               1050      movem.l d2,-(sp)
+000FE968  2039 000FE9D2           1051      move.l  RANDOMVAL,d0
+000FE96E  72AF                    1052      moveq   #$AF-$100,d1
+000FE970  7412                    1053      moveq   #18,d2
+000FE972                          1054  Ninc0   
+000FE972  D080                    1055      add.l   d0,d0
+000FE974  6400 0004               1056      bcc Ninc1
+000FE978  B300                    1057      eor.b   d1,d0
+000FE97A                          1058  Ninc1
+000FE97A  51CA FFF6               1059      dbf d2,Ninc0
+000FE97E                          1060      
+000FE97E  23C0 000FE9D2           1061      move.l  d0,RANDOMVAL
+000FE984  4286                    1062      clr.l   d6
+000FE986  1C00                    1063      move.b  d0,d6
+000FE988                          1064      
+000FE988  4CDF 0004               1065      movem.l (sp)+,d2
+000FE98C  4CDF 0002               1066      movem.l (sp)+,d1
+000FE990  4CDF 0001               1067      movem.l (sp)+,d0
+000FE994  4E75                    1068      rts
+000FE996                          1069      
+000FE996                          1070  getRandomLongIntoD6
+000FE996  48E7 FFFE               1071      movem.l ALL_REG,-(sp)
+000FE99A  4EB9 000FE95C           1072      jsr     getRandomByteIntoD6
+000FE9A0  1A06                    1073      move.b  d6,d5
+000FE9A2  4EB9 000FE95C           1074      jsr     getRandomByteIntoD6
+000FE9A8  E18D                    1075      lsl.l   #8,d5
+000FE9AA  1A06                    1076      move.b  d6,d5
+000FE9AC  4EB9 000FE95C           1077      jsr     getRandomByteIntoD6
+000FE9B2  E18D                    1078      lsl.l   #8,d5
+000FE9B4  1A06                    1079      move.b  d6,d5
+000FE9B6  4EB9 000FE95C           1080      jsr     getRandomByteIntoD6
+000FE9BC  E18D                    1081      lsl.l   #8,d5
+000FE9BE  1A06                    1082      move.b  d6,d5
+000FE9C0  23C5 000FE9D6           1083      move.l  d5,TEMPRANDOMLONG
+000FE9C6  4CDF 7FFF               1084      movem.l (sp)+,ALL_REG
+000FE9CA  2C39 000FE9D6           1085      move.l  TEMPRANDOMLONG,d6
+000FE9D0  4E75                    1086      rts
+000FE9D2                          1087  
+000FE9D2                          1088  
+000FE9D2                          1089  
+000FE9D2                          1090  RANDOMVAL               ds.l    1
+000FE9D6                          1091  TEMPRANDOMLONG          ds.l    1
+000FE9DA                          1092  xCoordFruit             ds.l    1
+000FE9DE                          1093  yCoordFruit             ds.l    1
+000FE9E2                          1094  
+000FE9E2                          1095  
+000FE9E2                          1096  
+000FE9E2                          1097  
+000FE9E2                          1098  
+000FE9E2                          1099  
+000FE9E2                          1100  
+000FE9E2                          1101  
+000FE9E2                          1102  
+000FE9E2                          1103  
+000FE9E2                          1104  
+000FE9E2                          1105  
+000FE9E2                          1106  
+000FE9E2                          1107  
+000FE9E2                          1108  
+000FE9E2                          1109  
+000FE9E2                          1110  
+000FE9E2                          1111  
+000FE9E2                          1112  
+000FE9E2                          1113  
+000FE9E2                          1114  
+000FE9E2                          1115  
+000FE9E2                          1116  -------------------- end include --------------------
+000FE9E2                          1117      INCLUDE collisionChecks.X68
+000FE9E2  =00000014               1118  FRUIT_HITBOX_WIDTH         equ 20
+000FE9E2  =0000000A               1119  SELF_HITBOX_WIDTH          equ 10
+000FE9E2  =00000029               1120  SNAKE_BODY_HIT_WIDTH       equ 41
+000FE9E2  =0000001F               1121  IGNORE_SNAKE_LENGTH        equ 31
+000FE9E2  =00000014               1122  SNAKE_OFFSET               equ 20
+000FE9E2  =00000005               1123  VELOCITY_INCREASE          equ 5
+000FE9E2  =0000000A               1124  SNAKE_LENGTH_INCREASE      equ 10
+000FE9E2  =00000001               1125  SCORE_INCREASE             equ 1
+000FE9E2                          1126  
+000FE9E2  =000002F5               1127  RIGHT_SIDE_OF_SCREEN       equ 757
+000FE9E2  =00000019               1128  UP_SIDE_OF_SCREEN          equ 25
+000FE9E2  =0000022D               1129  DOWN_SIDE_OF_SCREEN        equ 557
+000FE9E2  =0000001E               1130  LEFT_SIDE_OF_SCREEN        equ 30
+000FE9E2                          1131  
+000FE9E2                          1132  
+000FE9E2                          1133  fruitCollisionCheck
+000FE9E2  48E7 FFFE               1134      movem.l ALL_REG, -(sp)
+000FE9E6                          1135      
+000FE9E6  2639 000FC8E2           1136      move.l SnakeX,d3                                 ;d3= start x coord of snake head
+000FE9EC  E883                    1137      asr.l  #FRACTIONAL_BITS,d3
+000FE9EE  5C83                    1138      addi.l #SNAKE_WIDTH>>1, d3                       ;move x to middle 
+000FE9F0                          1139   
+000FE9F0  2839 000FD882           1140      move.l SnakeY,d4                                 ;d4=start y coord of snake head
+000FE9F6  E884                    1141      asr.l  #FRACTIONAL_BITS,d4
+000FE9F8  5C84                    1142      addi.l #SNAKE_HEIGHT>>1, d4                      ;move y to middle 
+000FE9FA                          1143      
+000FE9FA  2239 000FE9DA           1144      move.l xCoordFruit,d1                            ;d1=start x of fruit (left bound)
+000FEA00  0481 0000000A           1145      subi.l #FRUIT_HITBOX_WIDTH>>1,d1                 ;make hit box larger by starting (x-10,y-10)
+000FEA06  2439 000FE9DE           1146      move.l yCoordFruit,d2                            ;d2=start y of fruit (upper bound) 
+000FEA0C  0482 0000000A           1147      subi.l #FRUIT_HITBOX_WIDTH>>1,d2
+000FEA12                          1148      
+000FEA12  2A01                    1149      move.l d1,d5
+000FEA14  0685 00000021           1150      add.l #(FRUIT_WIDTH+FRUIT_HITBOX_WIDTH),d5       ;d5 has right bound (accounting for larger hitbox)
+000FEA1A                          1151      
+000FEA1A  2C02                    1152      move.l d2,d6
+000FEA1C  0686 00000023           1153      add.l #(FRUIT_HEIGHT+FRUIT_HITBOX_WIDTH),d6      ;d6 has lower bound
+000FEA22                          1154      
+000FEA22                          1155  checkX:
+000FEA22  B681                    1156      cmp.l d1,d3                                      ;is snake x before our left bound?
+000FEA24  6D00 0064               1157      blt noCollision
+000FEA28  B685                    1158      cmp.l d5,d3                                      ;is snake x after our right bound?
+000FEA2A  6E00 005E               1159      bgt noCollision
+000FEA2E                          1160      
+000FEA2E                          1161      
+000FEA2E                          1162  checkY:
+000FEA2E  B882                    1163      cmp.l d2,d4                                      ;is snake y before our upper bound?
+000FEA30  6D00 0058               1164      blt noCollision
+000FEA34  B886                    1165      cmp.l d6,d4                                      ;is snake y after our lower bound?
+000FEA36  6E00 0052               1166      bgt noCollision
+000FEA3A                          1167      
+000FEA3A                          1168  collision:     
+000FEA3A  4EB9 000FEBBA           1169      jsr playEatSound    
+000FEA40  4EB9 000FEFEC           1170      jsr eraseFruit
+000FEA46  4EB9 000FE846           1171      jsr spawnFruit                                   
+000FEA4C                          1172  
+000FEA4C  49F9 000FEB9A           1173      lea Score, a4
+000FEA52  4CD4 0002               1174      movem.l (a4),d1
+000FEA56  5281                    1175      add.l #SCORE_INCREASE,d1
+000FEA58  48D4 0002               1176      movem.l d1, (a4)                                 ;add 1 to score
+000FEA5C  4EB9 000FED02           1177      jsr callScoreFunction                            ;change 7 segment led
+000FEA62                          1178      
+000FEA62  45F9 000FE83A           1179      lea Velocity, a2                                 ;snake gets faster
+000FEA68  4CD2 0040               1180      movem.l (a2),d6
+000FEA6C  5A86                    1181      addi.l #VELOCITY_INCREASE,d6 
+000FEA6E  2486                    1182      move.l d6,(a2)
+000FEA70                          1183      
+000FEA70  45F9 000FE822           1184      lea SnakeBodyLength, a2                          ;snake gets longer (snake length +20px)
+000FEA76  4CD2 0040               1185      movem.l (a2),d6
+000FEA7A  0686 0000000A           1186      addi.l #SNAKE_LENGTH_INCREASE,d6
+000FEA80  48D2 0040               1187      movem.l d6,(a2)  
+000FEA84  4EB9 000FEEA2           1188      jsr updateBody                                   ;shift everything back once to make space for head
+000FEA8A                          1189      
+000FEA8A                          1190     
+000FEA8A                          1191  noCollision:
+000FEA8A  4CDF 7FFF               1192      movem.l (sp)+,ALL_REG
+000FEA8E  4E75                    1193      rts
+000FEA90                          1194  
+000FEA90                          1195  
+000FEA90                          1196  wallCollisionCheck
+000FEA90  48E7 FFFE               1197      movem.l ALL_REG, -(sp)
+000FEA94                          1198      
+000FEA94                          1199      *check left corner of head
+000FEA94  2439 000FD882           1200      move.l SnakeY,d2                                 ;check if our x or y reaches the boundary
+000FEA9A  2E39 000FC8E2           1201      move.l SnakeX,d7
+000FEAA0  0C82 00000190           1202      cmpi.l  #UP_SIDE_OF_SCREEN<<FRACTIONAL_BITS,d2   
+000FEAA6  6D00 0040               1203      blt setFlag                                     ;if so, exit the game
+000FEAAA  0C87 000001E0           1204      cmpi.l  #LEFT_SIDE_OF_SCREEN<<FRACTIONAL_BITS,d7 
+000FEAB0  6D00 0036               1205      blt setFlag
+000FEAB4  0C82 000022D0           1206      cmpi.l  #DOWN_SIDE_OF_SCREEN<<FRACTIONAL_BITS,d2  
+000FEABA  6E00 002C               1207      bgt setFlag
+000FEABE  0C87 00002F50           1208      cmpi.l  #RIGHT_SIDE_OF_SCREEN<<FRACTIONAL_BITS,d7 
+000FEAC4  6E00 0022               1209      bgt setFlag
+000FEAC8                          1210      
+000FEAC8                          1211      *check right corner
+000FEAC8  0687 0000000D           1212      addi.l #SNAKE_WIDTH,d7
+000FEACE  0C87 000001E0           1213      cmpi.l  #LEFT_SIDE_OF_SCREEN<<FRACTIONAL_BITS,d7 
+000FEAD4  6D00 0012               1214      blt setFlag
+000FEAD8  0C87 00002F50           1215      cmpi.l  #RIGHT_SIDE_OF_SCREEN<<FRACTIONAL_BITS,d7 
+000FEADE  6E00 0008               1216      bgt setFlag
+000FEAE2                          1217      
+000FEAE2  4CDF 7FFF               1218      movem.l (sp)+,ALL_REG
+000FEAE6  4E75                    1219      rts
+000FEAE8                          1220      
+000FEAE8                          1221  setFlag:
+000FEAE8  4EB9 000FEB82           1222      jsr flagCollision
+000FEAEE  4CDF 7FFF               1223      movem.l (sp)+,ALL_REG
+000FEAF2  4E75                    1224      rts
+000FEAF4                          1225  
+000FEAF4                          1226  
+000FEAF4                          1227  selfCollisionCheck
+000FEAF4                          1228      *each of our body segments has a hitbox
+000FEAF4  48E7 FFFE               1229      movem.l ALL_REG, -(sp)
+000FEAF8                          1230      
+000FEAF8  2A39 000FE822           1231      move.l SnakeBodyLength, d5
+000FEAFE  0C85 00000029           1232      cmpi.l #SNAKE_BODY_HIT_WIDTH, d5
+000FEB04  6D00 0076               1233      blt noSelfCollision                              ;do we only have our head and first 3 segments?
+000FEB08                          1234      
+000FEB08  43F9 000FC8E2           1235      lea SnakeX, a1
+000FEB0E  45F9 000FD882           1236      lea SnakeY, a2
+000FEB14                          1237      
+000FEB14                          1238      *check middle of head
+000FEB14  2211                    1239      move.l (a1),d1
+000FEB16  E881                    1240      asr.l  #FRACTIONAL_BITS,d1
+000FEB18  5C81                    1241      addi.l #SNAKE_WIDTH>>1, d1                       ;move to middle
+000FEB1A  2412                    1242      move.l (a2),d2                                   ;get our current head coordinates d1=x1, d2=y1
+000FEB1C  E882                    1243      asr.l  #FRACTIONAL_BITS,d2
+000FEB1E                          1244       
+000FEB1E  7E14                    1245      move.l #SNAKE_OFFSET,d7                          ;d7 keeps track of offset since we are adding by 10 segments each time
+000FEB20  0485 0000001F           1246      subi.l #IGNORE_SNAKE_LENGTH,d5                   ;skip first 3 segments to allow for turns
+000FEB26                          1247  
+000FEB26                          1248  selfCollisionCheckLoop:
+000FEB26  E58F                    1249      lsl.l #2,d7                                      ;offset by *4
+000FEB28                          1250      
+000FEB28  2631 7000               1251      move.l (a1,d7),d3                                ;d3=x2
+000FEB2C  E883                    1252      asr.l  #FRACTIONAL_BITS,d3
+000FEB2E  5B83                    1253      subi.l #SELF_HITBOX_WIDTH>>1,d3                  ;hitbox is larger our sides cannot touch during tight turns    
+000FEB30  2832 7000               1254      move.l (a2,d7),d4                                ;d4=y2
+000FEB34  E884                    1255      asr.l  #FRACTIONAL_BITS,d4
+000FEB36  5B84                    1256      subi.l #SELF_HITBOX_WIDTH>>1,d4
+000FEB38                          1257      
+000FEB38  2A03                    1258      move.l d3,d5
+000FEB3A  2C04                    1259      move.l d4,d6 
+000FEB3C                          1260      
+000FEB3C  0685 00000017           1261      addi.l #(SNAKE_WIDTH+SELF_HITBOX_WIDTH),d5       ;d5 is our end x 
+000FEB42  0686 00000017           1262      addi.l #(SNAKE_HEIGHT+SELF_HITBOX_WIDTH),d6      ;d6 is our end y 
+000FEB48                          1263      
+000FEB48                          1264  checkSnakeX:
+000FEB48  B283                    1265      cmp.l d3,d1                                      ;is snake x before our left bound?
+000FEB4A  6D00 0020               1266      blt continueCheck
+000FEB4E  B285                    1267      cmp.l d5,d1                                      ;is snake x after our right bound?
+000FEB50  6E00 001A               1268      bgt continueCheck
+000FEB54                          1269         
+000FEB54                          1270  checkSnakeY:
+000FEB54  B484                    1271      cmp.l d4,d2                                      ;is snake y before our upper bound?
+000FEB56  6D00 0014               1272      blt continueCheck
+000FEB5A  B486                    1273      cmp.l d6,d2                                      ;is snake y after our lower bound?
+000FEB5C  6E00 000E               1274      bgt continueCheck
+000FEB60                          1275  
+000FEB60                          1276  selfCollision:     
+000FEB60  4EB9 000FEB82           1277      jsr flagCollision
+000FEB66  4CDF 7FFF               1278      movem.l (sp)+,ALL_REG
+000FEB6A  4E75                    1279      rts
+000FEB6C                          1280      
+000FEB6C                          1281  continueCheck:
+000FEB6C  E48F                    1282      lsr.l  #2,d7                                      ;reset and increment the index
+000FEB6E  5287                    1283      addi.l #1,d7
+000FEB70  2A39 000FE822           1284      move.l SnakeBodyLength, d5
+000FEB76  5385                    1285      subi.l #1,d5                                     ;check from index 11 to length-1
+000FEB78  BE85                    1286      cmp.l d5, d7                                     ;did we reach the end of our snake?
+000FEB7A  6DAA                    1287      blt selfCollisionCheckLoop
+000FEB7C                          1288  
+000FEB7C                          1289  noSelfCollision:
+000FEB7C  4CDF 7FFF               1290      movem.l (sp)+,ALL_REG
+000FEB80  4E75                    1291      rts
+000FEB82                          1292  
+000FEB82                          1293  
+000FEB82                          1294  flagCollision
+000FEB82  48E7 FFFE               1295      movem.l ALL_REG, -(sp)
+000FEB86  41F9 000FEB96           1296      lea CollisionFlag,a0
+000FEB8C  10BC 0001               1297      move.b #1,(a0)
+000FEB90  4CDF 7FFF               1298      movem.l (sp)+,ALL_REG
+000FEB94  4E75                    1299      rts
+000FEB96                          1300  
+000FEB96                          1301  
+000FEB96= 00000000                1302  CollisionFlag               dc.l    0
+000FEB9A                          1303  Score                       ds.l    1
+000FEB9E                          1304  
+000FEB9E                          1305  
+000FEB9E                          1306  
+000FEB9E                          1307  
+000FEB9E                          1308  
+000FEB9E                          1309  
+000FEB9E                          1310  
+000FEB9E                          1311  
+000FEB9E                          1312  
+000FEB9E                          1313  
+000FEB9E                          1314  
+000FEB9E                          1315  
+000FEB9E                          1316  
+000FEB9E                          1317  
+000FEB9E                          1318  
+000FEB9E                          1319  
+000FEB9E                          1320  
+000FEB9E                          1321  
+000FEB9E                          1322  
+000FEB9E                          1323  
+000FEB9E                          1324  
+000FEB9E                          1325  
+000FEB9E                          1326  
+000FEB9E                          1327  
+000FEB9E                          1328  
+000FEB9E                          1329  
+000FEB9E                          1330  
+000FEB9E                          1331  
+000FEB9E                          1332  
+000FEB9E                          1333  
+000FEB9E                          1334  
+000FEB9E                          1335  -------------------- end include --------------------
+000FEB9E                          1336      INCLUDE gameAudio.X68
+000FEB9E  =00000049               1337  PLAY_MULTIPLE_SOUND_TRAP_CODE equ 73
+000FEB9E  =00000046               1338  PLAY_SOUND_TRAP_CODE equ 70
+000FEB9E                          1339  
+000FEB9E                          1340  playCollisionSound
+000FEB9E  43F9 000FEBF6           1341      lea CollisionSound, a1
+000FEBA4  103C 0046               1342      move.b  #PLAY_SOUND_TRAP_CODE, d0 
+000FEBA8  4E4F                    1343      trap #15
+000FEBAA  4E75                    1344      rts
+000FEBAC                          1345  
+000FEBAC                          1346  playTurnSound
+000FEBAC  43F9 000FEC12           1347      lea TurnSound, a1
+000FEBB2  103C 0049               1348      move.b #PLAY_MULTIPLE_SOUND_TRAP_CODE, d0                 
+000FEBB6  4E4F                    1349      trap #15
+000FEBB8  4E75                    1350      rts
+000FEBBA                          1351  
+000FEBBA                          1352  playEatSound
+000FEBBA  43F9 000FEBD6           1353      lea ChompSound, a1
+000FEBC0  103C 0049               1354      move.b #PLAY_MULTIPLE_SOUND_TRAP_CODE, d0        
+000FEBC4  4E4F                    1355      trap #15
+000FEBC6  4E75                    1356      rts
+000FEBC8                          1357  
+000FEBC8                          1358  playEnterSound
+000FEBC8  43F9 000FEC2E           1359      lea EnterSound, a1
+000FEBCE  103C 0046               1360      move.b #PLAY_SOUND_TRAP_CODE, d0 
+000FEBD2  4E4F                    1361      trap #15
+000FEBD4  4E75                    1362      rts
+000FEBD6                          1363  
+000FEBD6                          1364  
+000FEBD6                          1365  
+000FEBD6= 7761765F 66696C65 ...   1366  ChompSound              dc.l    'wav_files\chomp_sound.wav',0
+000FEBF6= 7761765F 66696C65 ...   1367  CollisionSound          dc.l    'wav_files\game_end.wav',0
+000FEC12= 7761765F 66696C65 ...   1368  TurnSound               dc.l    'wav_files\turn_sound.wav',0
+000FEC2E= 7761765F 66696C65 ...   1369  EnterSound              dc.l    'wav_files\enter_game.wav',0
+000FEC4A                          1370  
+000FEC4A                          1371  
+000FEC4A                          1372  
+000FEC4A                          1373  
+000FEC4A                          1374  
+000FEC4A                          1375  
+000FEC4A                          1376  
+000FEC4A                          1377  
+000FEC4A                          1378  
+000FEC4A                          1379  
+000FEC4A                          1380  
+000FEC4A                          1381  
+000FEC4A                          1382  
+000FEC4A                          1383  
+000FEC4A                          1384  -------------------- end include --------------------
+000FEC4A                          1385      INCLUDE sevenSegmentScore.X68
+000FEC4A  =00000004               1386  READ_NUMBER_TRAP_CODE           equ     4
+000FEC4A  =00000054               1387  DRAW_LINE_TRAP_CODE             equ     84      
+000FEC4A                          1388  
+000FEC4A  =00000280               1389  SEG_CENTER__X                   equ     640
+000FEC4A  =000001E0               1390  SEG_CENTER__Y                   equ     480
+000FEC4A                          1391  
+000FEC4A  =00000050               1392  SEG_WIDTH                       equ     80
+000FEC4A  =0000000A               1393  SEG_HEIGHT                      equ     10
+000FEC4A                          1394  
+000FEC4A  =00000000               1395  SET_START_X_OFFSET              equ     0
+000FEC4A  =00000004               1396  SET_START_Y_OFFSET              equ     4
+000FEC4A  =00000008               1397  SET_END_X_OFFSET                equ     8
+000FEC4A  =0000000C               1398  SET_END_Y_OFFSET                equ     12
+000FEC4A                          1399  
+000FEC4A  =00000004               1400  GET_START_X_OFFSET              equ     4
+000FEC4A  =00000008               1401  GET_START_Y_OFFSET              equ     8
+000FEC4A  =0000000C               1402  GET_END_X_OFFSET                equ     12
+000FEC4A  =00000010               1403  GET_END_Y_OFFSET                equ     16
+000FEC4A                          1404  
+000FEC4A                          1405  
+000FEC4A  =00000166               1406  SCORE_BOX_X                     equ     $166
+000FEC4A  =0000025C               1407  SCORE_BOX_Y                     equ     $25C
+000FEC4A  =00000050               1408  SCORE_BOX_WIDTH                 equ     80
+000FEC4A  =00000032               1409  SCORE_BOX_HEIGHT                equ     50
+000FEC4A                          1410  
+000FEC4A  =0000019A               1411  SCORE_LEFT_X                    equ     $19A   
+000FEC4A  =000001AE               1412  SCORE_RIGHT_X                   equ     $1AE 
+000FEC4A                          1413  
+000FEC4A  =00000260               1414  SCORE_UPPER_Y                   equ     $260
+000FEC4A  =00000274               1415  SCORE_MIDDLE_Y                  equ     $274
+000FEC4A  =00000288               1416  SCORE_LOWER_Y                   equ     $288
+000FEC4A                          1417  
+000FEC4A  =00000172               1418  SCORE_LEFT_X2                   equ     $172   
+000FEC4A  =00000186               1419  SCORE_RIGHT_X2                  equ     $186 
+000FEC4A                          1420  
+000FEC4A                          1421  
+000FEC4A                          1422  drawSegment
+000FEC4A  223C 00FFFFFF           1423      move.l #WHITE, d1
+000FEC50  7050                    1424      move.l #PEN_COLOR_TRAP_CODE, d0          ;set outline color
+000FEC52  4E4F                    1425      trap   #15
+000FEC54  222F 0004               1426      move.l  GET_START_X_OFFSET(sp),d1
+000FEC58  242F 000C               1427      move.l  GET_END_X_OFFSET(sp),d2 
+000FEC5C                          1428  
+000FEC5C  222F 0004               1429      move.l  GET_START_X_OFFSET(sp),d1
+000FEC60  242F 0008               1430      move.l  GET_START_Y_OFFSET(sp),d2
+000FEC64  262F 000C               1431      move.l  GET_END_X_OFFSET(sp),d3
+000FEC68  282F 0010               1432      move.l  GET_END_Y_OFFSET(sp),d4 
+000FEC6C  7054                    1433      move.l  #DRAW_LINE_TRAP_CODE,d0
+000FEC6E  4E4F                    1434      trap #15    
+000FEC70                          1435      
+000FEC70  4E75                    1436      rts
+000FEC72                          1437  
+000FEC72                          1438  
+000FEC72                          1439  drawOnesPlace
+000FEC72  43F9 000FED96           1440      lea StartXOnes, a1
+000FEC78  45F9 000FEDB2           1441      lea StartYOnes, a2
+000FEC7E  47F9 000FEDCE           1442      lea EndXOnes, a3
+000FEC84  49F9 000FEDEA           1443      lea EndYOnes, a4
+000FEC8A  7E00                    1444      move.l  #0, d7                            ;d7 keeps track of offset for parameter
+000FEC8C  4EB9 000FECB6           1445      jsr checkSeg
+000FEC92  4E75                    1446      rts
+000FEC94                          1447      
+000FEC94                          1448  
+000FEC94                          1449  drawTensPlace
+000FEC94  43F9 000FEE06           1450      lea StartXTens, a1
+000FEC9A  45F9 000FEE22           1451      lea StartYTens, a2
+000FECA0  47F9 000FEE3E           1452      lea EndXTens, a3
+000FECA6  49F9 000FEE5A           1453      lea EndYTens, a4
+000FECAC  7E00                    1454      move.l  #0, d7                            ;d7 keeps track of offset for parameter   
+000FECAE  4EB9 000FECB6           1455      jsr checkSeg
+000FECB4  4E75                    1456      rts
+000FECB6                          1457      
+000FECB6                          1458       
+000FECB6                          1459  checkSeg
+000FECB6  2A39 000FEE9E           1460      move.l NumSegments,d5
+000FECBC  5385                    1461      subi.l #1,d5                              ;using dbra for drawing segments loop
+000FECBE                          1462      
+000FECBE                          1463  getBitmask:
+000FECBE  2206                    1464      move.l d6, d1                             ;get bitmask
+000FECC0  C2BC 00000001           1465      and.l #1,d1                               ;get the last bit
+000FECC6  0C01 0000               1466      cmpi.b #00,d1                             ;if it is not "on" (1), skip
+000FECCA  6700 002C               1467      beq skipSeg
+000FECCE                          1468  
+000FECCE                          1469  draw:
+000FECCE  9FFC 00000010           1470      sub.l   #16, sp                           ;4 arguments:
+000FECD4  2F71 7000 0000          1471      move.l  (a1,d7),SET_START_X_OFFSET(sp)    ;start x
+000FECDA  2F72 7000 0004          1472      move.l  (a2,d7),SET_START_y_OFFSET(sp)    ;start y
+000FECE0  2F73 7000 0008          1473      move.l  (a3,d7),SET_END_X_OFFSET(sp)      ;end x
+000FECE6  2F74 7000 000C          1474      move.l  (a4,d7),SET_END_Y_OFFSET(sp)      ;end y
+000FECEC  4EB9 000FEC4A           1475      jsr drawSegment
+000FECF2  DFFC 00000010           1476      add.l   #16, sp                           ;fix stack
+000FECF8                          1477      
+000FECF8                          1478  skipSeg:
+000FECF8  E28E                    1479      lsr.l #1,d6                               ;go to next bit
+000FECFA  5887                    1480      add.l #4,d7
+000FECFC  51CD FFC0               1481      dbra d5, getBitmask
+000FED00                          1482  
+000FED00  4E75                    1483      rts
+000FED02                          1484             
+000FED02                          1485  callScoreFunction
+000FED02  4EB9 000FED58           1486      jsr eraseScore                            ;clears score area 
+000FED08                          1487        
+000FED08                          1488  firstNum:
+000FED08  4EB8 1062               1489      jsr clearRegisters
+000FED0C  4CF9 0020 000FEB9A      1490      movem.l Score,d5
+000FED14  8AFC 000A               1491      divu #10, d5                              ;d5=get our score remainder (ones place)
+000FED18  4245                    1492      clr.w d5
+000FED1A  4845                    1493      swap d5
+000FED1C  E58D                    1494      lsl.l #2,d5                               ;offset to correct bitmask (*4)
+000FED1E  41F9 000FEE76           1495      lea BitmaskTable,a0                       ;load up bitmask table
+000FED24  2C30 5000               1496      move.l (a0,d5),d6                         ;d6=bitmask
+000FED28  4EB9 000FEC72           1497      jsr drawOnesPlace                         ;draw the number
+000FED2E                          1498      
+000FED2E                          1499  secondNum:
+000FED2E  4EB8 1062               1500      jsr clearRegisters
+000FED32  4CF9 0020 000FEB9A      1501      movem.l Score,d5
+000FED3A  8AFC 000A               1502      divu #10, d5                              ;d5=get our score whole number (tenths)
+000FED3E  4845                    1503      swap d5
+000FED40  4245                    1504      clr.w d5
+000FED42  4845                    1505      swap d5
+000FED44  E58D                    1506      lsl.l #2,d5                               ;offset to correct bitmask (*4)  
+000FED46  41F9 000FEE76           1507      lea BitmaskTable,a0                       ;load up bitmask table
+000FED4C  2C30 5000               1508      move.l (a0,d5),d6                         ;d6=bitmask
+000FED50  4EB9 000FEC94           1509      jsr drawTensPlace                         ;draw the number
+000FED56                          1510      
+000FED56  4E75                    1511      rts
+000FED58                          1512  
+000FED58                          1513  
+000FED58                          1514  eraseScore
+000FED58  48E7 FFFE               1515      movem.l ALL_REG, -(sp)
+000FED5C  223C 002B331A           1516      move.l  #DARK_GREEN,d1
+000FED62  103C 0050               1517      move.b  #PEN_COLOR_TRAP_CODE,d0
+000FED66  4E4F                    1518      trap    #15
+000FED68  103C 0051               1519      move.b  #SET_FILL_COLOR_TRAP_CODE,d0
+000FED6C  4E4F                    1520      trap    #15
+000FED6E                          1521      
+000FED6E  103C 0057               1522      move.b  #DRAW_RECTANGLE_TRAP_CODE,d0 
+000FED72  223C 00000166           1523      move.l  #SCORE_BOX_X,d1
+000FED78  2601                    1524      move.l  d1,d3                                     
+000FED7A  0683 00000050           1525      addi.l  #SCORE_BOX_WIDTH,d3
+000FED80  243C 0000025C           1526      move.l  #SCORE_BOX_Y,d2                          
+000FED86  2802                    1527      move.l  d2,d4
+000FED88  0684 00000032           1528      add.l   #SCORE_BOX_HEIGHT,d4                         
+000FED8E  4E4F                    1529      trap    #15 
+000FED90                          1530      
+000FED90  4CDF 7FFF               1531      movem.l (sp)+,ALL_REG                                      
+000FED94  4E75                    1532      rts
+000FED96                          1533  
+000FED96                          1534  
+000FED96                          1535  
+000FED96                          1536  
+000FED96                          1537  
+000FED96= 0000019A 0000019A ...   1538  StartXOnes              dc.l    SCORE_LEFT_X,SCORE_LEFT_X,SCORE_LEFT_X,SCORE_LEFT_X,SCORE_RIGHT_X,SCORE_RIGHT_X,SCORE_LEFT_X
+000FEDB2= 00000274 00000260 ...   1539  StartYOnes              dc.l    SCORE_MIDDLE_Y,SCORE_UPPER_Y,SCORE_MIDDLE_Y,SCORE_LOWER_Y,SCORE_MIDDLE_Y,SCORE_UPPER_Y,SCORE_UPPER_Y
+000FEDCE= 000001AE 0000019A ...   1540  EndXOnes                dc.l    SCORE_RIGHT_X,SCORE_LEFT_X,SCORE_LEFT_X,SCORE_RIGHT_X,SCORE_RIGHT_X,SCORE_RIGHT_X,SCORE_RIGHT_X
+000FEDEA= 00000274 00000274 ...   1541  EndYOnes                dc.l    SCORE_MIDDLE_Y,SCORE_MIDDLE_Y,SCORE_LOWER_Y,SCORE_LOWER_Y,SCORE_LOWER_Y,SCORE_MIDDLE_Y,SCORE_UPPER_Y
+000FEE06                          1542  
+000FEE06= 00000172 00000172 ...   1543  StartXTens              dc.l    SCORE_LEFT_X2,SCORE_LEFT_X2,SCORE_LEFT_X2,SCORE_LEFT_X2,SCORE_RIGHT_X2,SCORE_RIGHT_X2,SCORE_LEFT_X2
+000FEE22= 00000274 00000260 ...   1544  StartYTens              dc.l    SCORE_MIDDLE_Y,SCORE_UPPER_Y,SCORE_MIDDLE_Y,SCORE_LOWER_Y,SCORE_MIDDLE_Y,SCORE_UPPER_Y,SCORE_UPPER_Y
+000FEE3E= 00000186 00000172 ...   1545  EndXTens                dc.l    SCORE_RIGHT_X2,SCORE_LEFT_X2,SCORE_LEFT_X2,SCORE_RIGHT_X2,SCORE_RIGHT_X2,SCORE_RIGHT_X2,SCORE_RIGHT_X2
+000FEE5A= 00000274 00000274 ...   1546  EndYTens                dc.l    SCORE_MIDDLE_Y,SCORE_MIDDLE_Y,SCORE_LOWER_Y,SCORE_LOWER_Y,SCORE_LOWER_Y,SCORE_MIDDLE_Y,SCORE_UPPER_Y
+000FEE76                          1547  
+000FEE76= 0000007E 00000030 ...   1548  BitmaskTable            dc.l    $7E,$30,$6D,$79,$33,$5B,$5F,$70,$7F,$7B  
+000FEE9E= 00000008                1549  NumSegments             dc.l    8
+000FEEA2                          1550  
+000FEEA2                          1551  
+000FEEA2                          1552  
+000FEEA2                          1553  
+000FEEA2                          1554  
+000FEEA2                          1555  
+000FEEA2                          1556  
+000FEEA2                          1557  
+000FEEA2                          1558  
+000FEEA2                          1559  
+000FEEA2                          1560  
+000FEEA2                          1561  
+000FEEA2                          1562  
+000FEEA2                          1563  
+000FEEA2                          1564  
+000FEEA2                          1565  
+000FEEA2                          1566  
+000FEEA2                          1567  
+000FEEA2                          1568  
+000FEEA2                          1569  
+000FEEA2                          1570  
+000FEEA2                          1571  
+000FEEA2                          1572  
+000FEEA2                          1573  
+000FEEA2                          1574  -------------------- end include --------------------
+000FEEA2                          1575      INCLUDE updateSnakeBody.X68
+000FEEA2                          1576      
+000FEEA2                          1577  updateBody
+000FEEA2  48E7 FFFE               1578      movem.l ALL_REG, -(sp)
+000FEEA6  49F9 000FC8E2           1579      lea SnakeX,a4                                    ;start at index 0
+000FEEAC  4CD4 0002               1580      movem.l (a4),d1 
+000FEEB0                          1581      
+000FEEB0  4BF9 000FD882           1582      lea SnakeY,a5
+000FEEB6  4CD5 0004               1583      movem.l (a5),d2 
+000FEEBA                          1584      
+000FEEBA  4CF9 0020 000FE822      1585      movem.l SnakeBodyLength,d5                       ;get snake length
+000FEEC2  5385                    1586      subi.l #1,d5 
+000FEEC4  6700 0034               1587      beq exitUpdate                                   ;if 0 (just the head), then no update
+000FEEC8  5385                    1588      subi.l #1,d5                                     ;otherwise, move to size -1
+000FEECA                          1589  
+000FEECA                          1590  pushBack:                                            ;move to second to last element in our x,y tables
+000FEECA                          1591  
+000FEECA  221C                    1592      move.l (a4)+,d1                                  ;move to next x coord and store previous in d1
+000FEECC  241D                    1593      move.l (a5)+,d2                                  ;move to next y coord and store previous in d2
+000FEECE                          1594      
+000FEECE  51CD FFFA               1595      dbra d5,pushBack
+000FEED2                          1596          
+000FEED2                          1597      * reset snake length for shiftElement loop
+000FEED2  4CF9 0020 000FE822      1598      movem.l SnakeBodyLength,d5
+000FEEDA  5385                    1599      subi.l #1,d5
+000FEEDC  6700 001C               1600      beq exitUpdate                                   ;if 0 (just the head), then no update
+000FEEE0  5385                    1601      subi.l #1,d5                                     ;otherwise, move to length-1
+000FEEE2                          1602  
+000FEEE2                          1603      *starting at the second to last element: arr[i+1]=arr[i] to shift coordinates back by 1 
+000FEEE2                          1604  shiftElement:
+000FEEE2  2881                    1605      move.l d1,(a4)
+000FEEE4  49EC FFFC               1606      lea -4(a4),a4
+000FEEE8  222C FFFC               1607      move.l -4(a4),d1
+000FEEEC                          1608      
+000FEEEC  2A82                    1609      move.l d2,(a5)
+000FEEEE  4BED FFFC               1610      lea  -4(a5),a5
+000FEEF2  242D FFFC               1611      move.l -4(a5),d2
+000FEEF6  51CD FFEA               1612      dbra d5, shiftElement
+000FEEFA                          1613      
+000FEEFA                          1614  exitUpdate:   
+000FEEFA  4CDF 7FFF               1615      movem.l (sp)+,ALL_REG
+000FEEFE  4E75                    1616      rts
+000FEF00                          1617  
+000FEF00                          1618  
+000FEF00                          1619  
+000FEF00                          1620  
+000FEF00                          1621  
+000FEF00                          1622  
+000FEF00                          1623  
+000FEF00                          1624  
+000FEF00                          1625  
+000FEF00                          1626  
+000FEF00                          1627  
+000FEF00                          1628  
+000FEF00                          1629  
+000FEF00                          1630  
+000FEF00                          1631  
+000FEF00                          1632  
+000FEF00                          1633  
+000FEF00                          1634  
+000FEF00                          1635  
+000FEF00                          1636  
+000FEF00                          1637  
+000FEF00                          1638  
+000FEF00                          1639  -------------------- end include --------------------
+000FEF00                          1640      INCLUDE gameDrawFunctions.X68   
+000FEF00                          1641  
+000FEF00                          1642  
+000FEF00                          1643  drawSnake
+000FEF00  48E7 FFFE               1644      movem.l ALL_REG, -(sp)
+000FEF04  223C 002B331A           1645      move.l  #DARK_GREEN,d1
+000FEF0A  103C 0050               1646      move.b  #PEN_COLOR_TRAP_CODE,d0
+000FEF0E  4E4F                    1647      trap    #15
+000FEF10  103C 0051               1648      move.b  #SET_FILL_COLOR_TRAP_CODE,d0
+000FEF14  4E4F                    1649      trap    #15 
+000FEF16                          1650      
+000FEF16  49F9 000FC8E2           1651      lea SnakeX,a4
+000FEF1C  4BF9 000FD882           1652      lea SnakeY,a5
+000FEF22                          1653      
+000FEF22  2A39 000FE822           1654      move.l  SnakeBodyLength,d5
+000FEF28  5385                    1655      subi.l #1, d5                                    ;using dbra, loop stops at -1
+000FEF2A                          1656  drawLoop:
+000FEF2A  221C                    1657      move.l  (a4)+,d1 
+000FEF2C  241D                    1658      move.l  (a5)+,d2 
+000FEF2E  E881                    1659      asr.l   #FRACTIONAL_BITS,d1                      ;d1= start x
+000FEF30  2601                    1660      move.l  d1,d3                                    ;d3= end x 
+000FEF32  0683 0000000D           1661      add.l   #SNAKE_WIDTH,d3  
+000FEF38  E882                    1662      asr.l   #FRACTIONAL_BITS,d2                      ;d2= start y
+000FEF3A  2802                    1663      move.l  d2,d4
+000FEF3C  0684 0000000D           1664      add.l   #SNAKE_HEIGHT,d4                         ;d4= end y 
+000FEF42                          1665      
+000FEF42                          1666      *is d1,d2 of our snake valid?
+000FEF42  0C82 00000019           1667      cmpi.l  #UP_SIDE_OF_SCREEN,d2   
+000FEF48  6D00 0026               1668      blt skipDrawRect                                
+000FEF4C  0C81 0000001E           1669      cmpi.l  #LEFT_SIDE_OF_SCREEN,d1 
+000FEF52  6D00 001C               1670      blt skipDrawRect
+000FEF56  0C82 0000022D           1671      cmpi.l  #DOWN_SIDE_OF_SCREEN,d2  
+000FEF5C  6E00 0012               1672      bgt skipDrawRect
+000FEF60  0C81 000002F5           1673      cmpi.l  #RIGHT_SIDE_OF_SCREEN,d1 
+000FEF66  6E00 0008               1674      bgt skipDrawRect
+000FEF6A                          1675  
+000FEF6A                          1676      *otherwise draw
+000FEF6A  103C 0057               1677      move.b  #DRAW_RECTANGLE_TRAP_CODE,d0 
+000FEF6E  4E4F                    1678      trap    #15
+000FEF70                          1679      
+000FEF70                          1680  skipDrawRect:      
+000FEF70  51CD FFB8               1681      dbra d5,drawLoop
+000FEF74                          1682  skipDraw:
+000FEF74  4CDF 7FFF               1683      movem.l (sp)+,ALL_REG         
+000FEF78  4E75                    1684      rts
+000FEF7A                          1685   
+000FEF7A                          1686      
+000FEF7A                          1687  replaceBackground
+000FEF7A  48E7 FFFE               1688      movem.l ALL_REG, -(sp)
+000FEF7E                          1689      
+000FEF7E  2A39 000FE822           1690      move.l  SnakeBodyLength,d5                       ;using dbra, loop ends at -1
+000FEF84  5385                    1691      subi.l #1,d5 
+000FEF86                          1692      
+000FEF86  49F9 000FC8E2           1693      lea SnakeX,a4 
+000FEF8C  4BF9 000FD882           1694      lea SnakeY,a5
+000FEF92                          1695   
+000FEF92                          1696  moveToTail:
+000FEF92  221C                    1697      move.l (a4)+,d1                                 
+000FEF94  241D                    1698      move.l (a5)+,d2                                 
+000FEF96  51CD FFFA               1699      dbra d5,moveToTail                               ;d1,d2 stores the start (x,y) for the tail
+000FEF9A                          1700      
+000FEF9A  41F9 0001A86A           1701      lea Background, a0
+000FEFA0  E881                    1702      asr.l   #FRACTIONAL_BITS,d1
+000FEFA2  5581                    1703      subi.l  #2, d1                                   ;make replacement box bigger
+000FEFA4  E882                    1704      asr.l   #FRACTIONAL_BITS,d2
+000FEFA6  5582                    1705      subi.l  #2, d2
+000FEFA8  9FFC 0000001C           1706      sub.l   #28, sp                                         
+000FEFAE  2F48 0000               1707      move.l  a0,SET_POINTER_OFFSET(sp)                       
+000FEFB2  2F7C 00000000 0004      1708      move.l  #0,SET_CHUNK_X_OFFSET(sp)                      
+000FEFBA  2F7C 00000000 0008      1709      move.l  #0,SET_CHUNK_Y_OFFSET(sp)                       
+000FEFC2  2F7C 00000011 000C      1710      move.l  #(SNAKE_WIDTH+4),SET_CHUNK_WIDTH_OFFSET(sp)     
+000FEFCA  2F7C 00000011 0010      1711      move.l  #(SNAKE_HEIGHT+4),SET_CHUNK_HEIGHT_OFFSET(sp)   
+000FEFD2  2F41 0014               1712      move.l  d1,SET_DISPLAY_X_OFFSET(sp)                     
+000FEFD6  2F42 0018               1713      move.l  d2,SET_DISPLAY_Y_OFFSET(sp)                    
+000FEFDA  4EB9 000FC6F2           1714      jsr     drawChunk                                ;draw background over the tail        
+000FEFE0  DFFC 0000001C           1715      add.l   #28, sp                                       
+000FEFE6  4CDF 7FFF               1716      movem.l (sp)+,ALL_REG
+000FEFEA  4E75                    1717      rts
+000FEFEC                          1718  
+000FEFEC                          1719  
+000FEFEC                          1720  eraseFruit
+000FEFEC  48E7 FFFE               1721      movem.l ALL_REG, -(sp)
+000FEFF0                          1722  
+000FEFF0                          1723      * get the old fruit coordinates
+000FEFF0  2239 000FE9DA           1724      move.l xCoordFruit, d1                     ; d1 = old fruit X position
+000FEFF6  2439 000FE9DE           1725      move.l yCoordFruit, d2                     ; d2 = old fruit Y position
+000FEFFC                          1726      
+000FEFFC                          1727      * redraw background at old fruit position
+000FEFFC  41F9 0001A86A           1728      lea Background, a0
+000FF002  9FFC 0000001C           1729      sub.l   #28, sp                                         
+000FF008  2F48 0000               1730      move.l  a0,SET_POINTER_OFFSET(sp)                       
+000FF00C  2F7C 00000000 0004      1731      move.l  #0,SET_CHUNK_X_OFFSET(sp)                      
+000FF014  2F7C 00000000 0008      1732      move.l  #0,SET_CHUNK_Y_OFFSET(sp)                       
+000FF01C  2F7C 0000000D 000C      1733      move.l  #FRUIT_WIDTH,SET_CHUNK_WIDTH_OFFSET(sp)         
+000FF024  2F7C 0000000F 0010      1734      move.l  #FRUIT_HEIGHT,SET_CHUNK_HEIGHT_OFFSET(sp)       
+000FF02C  2F41 0014               1735      move.l  d1,SET_DISPLAY_X_OFFSET(sp)                     
+000FF030  2F42 0018               1736      move.l  d2,SET_DISPLAY_Y_OFFSET(sp)                    
+000FF034  4EB9 000FC6F2           1737      jsr     drawChunk                                ; draw background over old fruit position        
+000FF03A  DFFC 0000001C           1738      add.l   #28, sp
+000FF040                          1739      
+000FF040                          1740  skipBackgroundRedraw:
+000FF040  4CDF 7FFF               1741      movem.l (sp)+,ALL_REG
+000FF044  4E75                    1742      rts
+000FF046                          1743  
+000FF046                          1744  
+000FF046                          1745  
+000FF046                          1746  
+000FF046                          1747  
+000FF046                          1748  
+000FF046                          1749  
+000FF046                          1750  -------------------- end include --------------------
+000FF046                          1751  
+000FF046                          1752  
+000FF046                          1753  
+000FF046                          1754      END    START        ; last line of source
+
+No errors detected
+No warnings generated
+
+
+SYMBOL TABLE INFORMATION
+Symbol-name         Value
+-------------------------
+ALL_REG             7FFF
+APPLE               CEFB0
+BACKGROUND          1A86A
+BACKGROUND_COLOR    5ABA9B
+BITMASKTABLE        FEE76
+BLACK               0
+CALLFUNCTION        FC594
+CALLSCOREFUNCTION   FED02
+CAPPED              FC60A
+CHECK               FC6C8
+CHECKOTHERINPUT     FC684
+CHECKSEG            FECB6
+CHECKSNAKEX         FEB48
+CHECKSNAKEY         FEB54
+CHECKVALIDMOVE      FC7C0
+CHECKVALIDMOVEEND   FC824
+CHECKX              FEA22
+CHECKY              FEA2E
+CHECK_INPUT_TRAP_CODE  13
+CHOMPSOUND          FEBD6
+CLEARLOOP           108A
+CLEARMEMORY         1074
+CLEARREGISTERS      1062
+CLEARSCREEN         143E
+CLEAR_SCREEN_TRAP_CODE  B
+COLLISION           FEA3A
+COLLISIONFLAG       FEB96
+COLLISIONSOUND      FEBF6
+CONTINUECHECK       FEB6C
+CONTINUEROW2CHUNK   FC778
+CURRTIME            FE842
+DARK_GREEN          2B331A
+DISPLAY_NUMBER_TRAP_CODE  3
+DOWN_OFFSET         4
+DOWN_SIDE_OF_SCREEN  22D
+DRAW                FECCE
+DRAWCHUNK           FC6F2
+DRAWLOOP            FEF2A
+DRAWONESPLACE       FEC72
+DRAWSEGMENT         FEC4A
+DRAWSNAKE           FEF00
+DRAWTENSPLACE       FEC94
+DRAW_COLOR_COMMAND  4
+DRAW_LINE_TRAP_CODE  54
+DRAW_MODE_TRAP_CODE  5C
+DRAW_PIXEL_TRAP_CODE  52
+DRAW_RECTANGLE_TRAP_CODE  57
+DRAW_UNFILLED_RECT  5A
+ENABLE_DOUBLE_BUFFER_TRAP_CODE  11
+ENDIANSWAP          FC7B4
+ENDXONES            FEDCE
+ENDXTENS            FEE3E
+ENDYONES            FEDEA
+ENDYTENS            FEE5A
+ENTERGAME           1034
+ENTERSOUND          FEC2E
+ENTER_KEY           D
+ENTER_SPACE_ASCII   D20
+ERASEFRUIT          FEFEC
+ERASESCORE          FED58
+EXITCHUNK           FC7B2
+EXITGAME            FC6B0
+EXITUPDATE          FEEFA
+FIRSTNUM            FED08
+FLAGCOLLISION       FEB82
+FRACTIONAL_BITS     4
+FRUITCOLLISIONCHECK  FE9E2
+FRUIT_HEIGHT        F
+FRUIT_HITBOX_WIDTH  14
+FRUIT_WIDTH         D
+GAMELOOP            FC56A
+GAMEOVERSCREEN      135A
+GAMEOVERTEXT        FC476
+GAMESCREEN          1246
+GAME_BORDER_HEIGHT  258
+GAME_BORDER_WIDTH   307
+GAME_BORDER_X       19
+GAME_BORDER_Y       14
+GAME_OVER_TEXT_X    122
+GAME_OVER_TEXT_Y    C3
+GETBITMASK          FECBE
+GETNEW              FE846
+GETRANDOMBYTEINTOD6  FE95C
+GETRANDOMLONGINTOD6  FE996
+GET_BITMAP_HEIGHT_OFFSET  16
+GET_BITMAP_WIDTH_OFFSET  12
+GET_BITS_OFFSET     1C
+GET_CHUNK_HEIGHT_OFFSET  14
+GET_CHUNK_WIDTH_OFFSET  10
+GET_CHUNK_X_OFFSET  8
+GET_CHUNK_Y_OFFSET  C
+GET_DISPLAY_X_OFFSET  18
+GET_DISPLAY_Y_OFFSET  1C
+GET_END_X_OFFSET    C
+GET_END_Y_OFFSET    10
+GET_IMAGE_DATA_OFFSET  A
+GET_PIXEL_COLOR_TRAP_CODE  53
+GET_POINTER_OFFSET  4
+GET_START_X_OFFSET  4
+GET_START_Y_OFFSET  8
+GET_TIME_TRAP_CODE  8
+GOTOGAME            FC6EE
+GOTOTITLE           FC6EA
+IGNORE_SNAKE_LENGTH  1F
+INSTRUCTIONSTEXT    FC506
+INS_TEXT_X          B4
+INS_TEXT_Y          28A
+KEEPCURRENTMOVE     FC81A
+KEYS                AE72A
+KEYS_HEIGHT         96
+KEYS_WIDTH          DE
+KEYS_Y              1A4
+LEFT_OFFSET         8
+LEFT_SIDE_OF_SCREEN  1E
+LOADIND_HEIGHT      5E
+LOADINGSCREEN       10AE
+LOADINGTEXT         144C
+LOADING_WIDTH       113
+LOADING_Y           FA
+LOGO                6E734
+LOGO_HEIGHT         9C
+LOGO_WIDTH          1A4
+LOGO_Y              3C
+MOVE                FC594
+MOVEDOWN            FC87E
+MOVELEFT            FC854
+MOVEOFFSET          FE826
+MOVERIGHT           FC8A8
+MOVETABLE           FC8D2
+MOVETOTAIL          FEF92
+MOVEUP              FC82A
+NINC0               FE972
+NINC1               FE97A
+NOCALL              FC584
+NOCOLLISION         FEA8A
+NOSELFCOLLISION     FEB7C
+NUMBERSHIFTS        FE832
+NUMSEGMENTS         FEE9E
+OFFSETTING          FC6A0
+PEN_COLOR_TRAP_CODE  50
+PEN_WIDTH           5
+PEN_WIDTH_TRAP_CODE  5D
+PLAYCOLLISIONSOUND  FEB9E
+PLAYEATSOUND        FEBBA
+PLAYENTERSOUND      FEBC8
+PLAYTURNSOUND       FEBAC
+PLAY_MULTIPLE_SOUND_TRAP_CODE  49
+PLAY_SOUND_TRAP_CODE  46
+PREVIOUSDIRECTION   FE82E
+PREVTIME            FE83E
+PUSHBACK            FEECA
+RANDOMVAL           FE9D2
+READ_NUMBER_TRAP_CODE  4
+REINITIALIZE        FC676
+REPAINT_SCREEN_TRAP_CODE  5E
+REPLACEBACKGROUND   FEF7A
+REQUESTEDDIRECTION  FE82A
+RESTART             101C
+RESTARTGAMETEXT     FC4C2
+RESTARTTITLETEXT    FC496
+RESTART_GAME_TEXT_X  122
+RESTART_GAME_TEXT_Y  F5
+RESTART_TITLE_TEXT_X  FE
+RESTART_TITLE_TEXT_Y  DC
+RIGHT_OFFSET        0
+RIGHT_SIDE_OF_SCREEN  2F5
+SAMECOLOR           FC792
+SCORE               FEB9A
+SCORE_BOX_FULL_HEIGHT  2A8
+SCORE_BOX_FULL_WIDTH  307
+SCORE_BOX_FULL_X    19
+SCORE_BOX_FULL_Y    23F
+SCORE_BOX_HEIGHT    32
+SCORE_BOX_WIDTH     50
+SCORE_BOX_X         166
+SCORE_BOX_Y         25C
+SCORE_INCREASE      1
+SCORE_LEFT_X        19A
+SCORE_LEFT_X2       172
+SCORE_LOWER_Y       288
+SCORE_MIDDLE_Y      274
+SCORE_RIGHT_X       1AE
+SCORE_RIGHT_X2      186
+SCORE_TEXT_POSITION  3F0D
+SCORE_UPPER_Y       260
+SCREEN_HEIGHT       2BC
+SCREEN_WIDTH        320
+SECONDNUM           FED2E
+SEEDRANDOMNUMBER    FE944
+SEG_CENTER__X       280
+SEG_CENTER__Y       1E0
+SEG_HEIGHT          A
+SEG_WIDTH           50
+SELFCOLLISION       FEB60
+SELFCOLLISIONCHECK  FEAF4
+SELFCOLLISIONCHECKLOOP  FEB26
+SELF_HITBOX_WIDTH   A
+SETFLAG             FEAE8
+SET_CHUNK_HEIGHT_OFFSET  10
+SET_CHUNK_WIDTH_OFFSET  C
+SET_CHUNK_X_OFFSET  4
+SET_CHUNK_Y_OFFSET  8
+SET_CURSOR_TRAP_CODE  B
+SET_DISPLAY_X_OFFSET  14
+SET_DISPLAY_Y_OFFSET  18
+SET_END_X_OFFSET    8
+SET_END_Y_OFFSET    C
+SET_FILL_COLOR_TRAP_CODE  51
+SET_OUTPUT_RESOLUTION_TRAP_CODE  21
+SET_POINTER_OFFSET  0
+SET_START_X_OFFSET  0
+SET_START_Y_OFFSET  4
+SET_TEXT_POSITION_TRAP_CODE  5F
+SHIFTELEMENT        FEEE2
+SKIP                FC79C
+SKIPBACKGROUNDREDRAW  FF040
+SKIPDRAW            FEF74
+SKIPDRAWRECT        FEF70
+SKIPSEG             FECF8
+SKULL               F3AC0
+SKULL_HEIGHT        58
+SKULL_WIDTH         64
+SKULL_Y             12C
+SNAKEBODYLENGTH     FE822
+SNAKEIMAGE          CF2F2
+SNAKEX              FC8E2
+SNAKEY              FD882
+SNAKE_BODY_HIT_WIDTH  29
+SNAKE_CENTER__X     190
+SNAKE_CENTER__Y     FA
+SNAKE_HEIGHT        D
+SNAKE_IMAGE_HEIGHT  96
+SNAKE_IMAGE_WIDTH   F9
+SNAKE_IMAGE_Y       FA
+SNAKE_INITIAL_VELOCITY  28
+SNAKE_LENGTH_INCREASE  A
+SNAKE_OFFSET        14
+SNAKE_WIDTH         D
+SOUNDFLAG           FE836
+SPACE_KEY           20
+SPAWNFRUIT          FE846
+SPEED_CAP_VELOCITY  50
+START               1000
+STARTGAMELOOP       FC546
+STARTXONES          FED96
+STARTXTENS          FEE06
+STARTYONES          FEDB2
+STARTYTENS          FEE22
+SWAPSCREEN          1436
+TEMPRANDOMLONG      FE9D6
+THIN_PEN_WIDTH      3
+THIRTYTWOBITCHUNK   FC746
+THIRTYTWOBITPIX     20
+TITLESCREEN         1102
+TITLETEXT           FC4E2
+TITLE_TEXT_X        115
+TITLE_TEXT_Y        258
+TURNSOUND           FEC12
+UPDATEBODY          FEEA2
+UP_OFFSET           C
+UP_SIDE_OF_SCREEN   19
+USEREQUESTEDMOVE    FC7FC
+VELOCITY            FE83A
+VELOCITY_INCREASE   5
+WALLCOLLISIONCHECK  FEA90
+WASD_ASCII          57415344
+WHITE               FFFFFF
+XCOORDFRUIT         FE9DA
+YCOORDFRUIT         FE9DE
